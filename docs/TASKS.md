@@ -19,5 +19,6 @@
 | F5 | Route panel v2: 3 strategies (labels), p95 + Jain, priority slider + callout | WIN | Done |
 | F6 | Plan panel v2: staffing_comparison (same staff-minutes, peak 25→18), drop 57% claim | WIN | Done |
 | F7 | Live replay: side-by-side animation from trace timeline, shortest line vs pooled | WIN | Done |
+| R1 | research/: physics-guided DEEP model (PyTorch) + sector embedding, few-shot new sector, MC uncertainty, stability bound = our research-gap contribution (standalone MVP) | WIN | In progress |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |

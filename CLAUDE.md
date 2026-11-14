@@ -44,6 +44,7 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 | api/ | Main machine | FastAPI. `uvicorn api.main:app --reload` from repo root |
 | frontend/ | Windows machine (teammate) | React dashboard |
 | docs/CONSTRAINTS.md | Teammate 3 / anyone | Log every constraint verbatim |
+| research/ | Windows machine | Standalone PyTorch research MVP (R1). Imports nothing from engine/. |
 | docs/BRIDGE.md, docs/TASKS.md | Shared | Append only; protocol in BRIDGE.md |
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
 
