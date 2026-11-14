@@ -42,6 +42,16 @@ def test_hybrid_beats_physics_and_data():
     assert err["hybrid"] < err["physics"] and err["hybrid"] < err["data"]
 
 
+def test_pooled_beats_shortest_line():
+    pooled = st.mean(sim.simulate_pooled(sim.make_people(seed=s))["avg_wait"] for s in range(50))
+    assert pooled < avg_wait(sim.pick_shortest_line)
+
+
+def test_timeline_shape():
+    tl = sim.timeline(sim.simulate_pooled(sim.make_people(seed=0)))
+    assert tl[0]["t"] == 0 and "waiting" in tl[0] and "C1" in tl[0]["queues"]
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):

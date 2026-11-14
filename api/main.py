@@ -12,24 +12,40 @@ class SimRequest(BaseModel):
     runs: int = 100          # average over this many random crowds
     closures: dict = {}      # e.g. {"C2": [[60, 150]]} -> C2 closed minutes 60-150
     priority_share: float = 0.0  # e.g. 0.1 -> 10% priority people; QueuePilot serves them first
+    trace: bool = False          # include per-5-min timeline (one crowd) for animation
+
+STRATEGIES = {
+    "fcfs": "Shortest line (what people do today)",
+    "queuepilot": "QueuePilot route-on-arrival",
+    "pooled": "QueuePilot pooled virtual queue (late binding)",
+}
+
+
+def _run(key, people, closures):
+    if key == "pooled":
+        return sim.simulate_pooled(people, closures, use_priority=True)
+    strat = sim.pick_shortest_line if key == "fcfs" else sim.pick_queuepilot
+    return sim.simulate(people, strat, closures, use_priority=(key == "queuepilot"))
+
 
 @app.post("/simulate")
 def simulate(req: SimRequest):
+    closures = {k: [tuple(w) for w in v] for k, v in req.closures.items()}
     out = {}
-    for key, strat in [("fcfs", sim.pick_shortest_line), ("queuepilot", sim.pick_queuepilot)]:
-        results = [sim.simulate(sim.make_people(req.n_people, seed=s, priority_share=req.priority_share), strat,
-                                {k: [tuple(w) for w in v] for k, v in req.closures.items()},
-                                use_priority=(key == "queuepilot")) for s in range(req.runs)]
-        util = {c: round(sum(r["utilisation"][c] for r in results) / req.runs)
-                for c in results[0]["utilisation"]}
-        out[key] = {
-            "avg_wait": round(sum(r["avg_wait"] for r in results) / req.runs, 1),
-            "max_wait": round(sum(r["max_wait"] for r in results) / req.runs, 1),
-            "utilisation": util,
-        }
+    for key in STRATEGIES:
+        results = [_run(key, sim.make_people(req.n_people, seed=s, priority_share=req.priority_share), closures)
+                   for s in range(req.runs)]
+        mean = lambda k: round(sum(r[k] for r in results) / req.runs, 2 if k == "jain_fairness" else 1)
+        out[key] = {k: mean(k) for k in ("avg_wait", "max_wait", "p95_wait", "jain_fairness")}
+        out[key]["utilisation"] = {c: round(sum(r["utilisation"][c] for r in results) / req.runs)
+                                   for c in results[0]["utilisation"]}
         for extra in ("avg_wait_priority", "avg_wait_normal"):
             if extra in results[0]:
-                out[key][extra] = round(sum(r[extra] for r in results) / req.runs, 1)
+                out[key][extra] = mean(extra)
+        if req.trace:  # one crowd (seed 0) for animation
+            one = _run(key, sim.make_people(req.n_people, seed=0, priority_share=req.priority_share), closures)
+            out[key]["timeline"] = sim.timeline(one)
+    out["labels"] = STRATEGIES
     return out
 
 

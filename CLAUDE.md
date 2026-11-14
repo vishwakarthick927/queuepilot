@@ -32,7 +32,8 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 - Services have average durations (id_card ~1 min, fee_query ~6, certificate ~20); actual time varies ±50%.
 - Counters have capabilities (C1, C2 do all; C3 id+fee; C4 id only).
 - Baseline "FCFS / shortest line": join counter with fewest people.
-- QueuePilot: among capable counters, pick lowest (estimated free time + SKILL_COST × extra skills). Uses only ESTIMATED durations.
+- QueuePilot route-on-arrival: among capable counters, pick lowest (estimated free time + SKILL_COST × extra skills). Uses only ESTIMATED durations.
+- QueuePilot pooled (best): one virtual queue; when a counter frees it takes the waiting person with max score = wait·AGING + priority bonus − skill mismatch. Pooling beats separate lines (M/M/c vs c×M/M/1).
 - Simulation: start = max(arrival, counter free_at); wait = start − arrival. Compare avg wait, max wait, utilisation, averaged over many seeds.
 - Result so far: QueuePilot ~10–17% lower average wait.
 
@@ -48,11 +49,14 @@ Only edit folders you own. Need a change elsewhere? Write it under REQUESTS belo
 
 ## JSON contract (do not change field names without updating this file)
 POST /simulate  body: {"n_people": 150, "runs": 100, "closures": {"C2": [[60, 150]]}, "priority_share": 0.1}   # closures, priority_share optional
-With priority_share > 0 each side also returns "avg_wait_priority" and "avg_wait_normal".
-Response:
-{"fcfs": {"avg_wait": 12.9, "max_wait": 123, "utilisation": {"C1": 94, "C2": 93, "C3": 47, "C4": 10}},
- "queuepilot": {"avg_wait": 10.7, "max_wait": 113, "utilisation": {"C1": 87, "C2": 91, "C3": 55, "C4": 17}}}
-Times in minutes, utilisation in %.
+Optional "trace": true → each strategy also gets "timeline": [{"t":0,"waiting":3,"queues":{"C1":1,...},"serving":{"C1":true,...}}, ...] every 5 min, one crowd (seed 0).
+Response: three strategies + labels. With priority_share > 0 each also has "avg_wait_priority", "avg_wait_normal".
+{"fcfs":       {"avg_wait": 16.5, "max_wait": 119.9, "p95_wait": 84.2, "jain_fairness": 0.27, "utilisation": {...}},
+ "queuepilot": {"avg_wait": 15.0, "max_wait": 103.0, "p95_wait": 68.5, "jain_fairness": 0.31, "utilisation": {...}},
+ "pooled":     {"avg_wait": 14.6, "max_wait": 92.7,  "p95_wait": 66.7, "jain_fairness": 0.32, "utilisation": {...}},
+ "labels": {"fcfs": "Shortest line (what people do today)", "queuepilot": "QueuePilot route-on-arrival", "pooled": "QueuePilot pooled virtual queue (late binding)"}}
+Times in minutes, utilisation in %. (100-run averages, n_people 150.)
+For pooled the per-counter "queues" in timeline are 0 (nobody is bound to a counter); use "waiting".
 
 GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 3.01},
  "example": {"minutes": [...60], "actual": [...], "physics": [...], "data": [...], "hybrid": [...]},
@@ -71,6 +75,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 18:25 [MAIN] — E8–E10 done (WIN proposals 1,4,5): pooled late-binding strategy, p95 + Jain fairness, trace timeline. Pooled vs shortest line: avg 16.5→14.6, max 120→93, p95 84→67.
 - 14 Nov 17:30 [WIN] — F1–F4 done: frontend/ React+Vite+TS+Tailwind dashboard (Forecast, Plan, Route with live closure toggles + sliders). Run: cd frontend && npm i && npm run dev. Falls back to saved real API responses if backend is down.
 - 14 Nov 17:30 [MAIN] — Added tests: `python -m tests.test_engine` (5 checks, all pass). Run after every constraint change.
 - 14 Nov 17:20 [MAIN] — Priority users: /simulate priority_share. 10% priority, 100 runs: priority wait 17.9 → 3.2 min, normal people unchanged (16.4).

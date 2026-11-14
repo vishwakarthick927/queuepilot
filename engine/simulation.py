@@ -106,19 +106,88 @@ def simulate(people, strategy, closures=None, use_priority=False):
         c["free_at_est"] = c["free_at_est"] + SERVICES[p["service"]]
         c["busy"] += p["duration"]
 
-    all_jobs = [j for c in counters for j in c["jobs"]]
-    waits = [j["start"] - j["p"]["arrive"] for j in all_jobs]
-    prio = [w for w, j in zip(waits, all_jobs) if j["p"].get("priority")]
-    norm = [w for w, j in zip(waits, all_jobs) if not j["p"].get("priority")]
-    total_time = max(j["end"] for j in all_jobs)
+    records = [{**j, "counter": c["name"]} for c in counters for j in c["jobs"]]
+    return _metrics(records, counters)
+
+
+# ---------- 4b. LATE BINDING: one pooled virtual queue ----------
+AGING = 1.0           # each minute waited adds 1 point
+SKILL_COST = 3       # minutes; same penalty QueuePilot uses for flexible counters
+PRIORITY_BONUS = 30   # a priority person counts as if they had waited 30 min more
+
+
+def simulate_pooled(people, closures=None, use_priority=False):
+    """Everyone joins ONE virtual queue (digital token). Nobody is bound to a counter.
+    When a counter frees up it asks "who next for me?" and takes the waiting person with
+    the highest score:  wait_so_far*AGING + priority bonus - skill mismatch.
+    Pooling is a classic queueing result: one shared queue for c servers beats c
+    separate queues (M/M/c vs c x M/M/1), and no one is stuck in "the wrong line"."""
+    closures = closures or {}
+    counters = [{**c, "free_at": 0.0, "busy": 0.0} for c in COUNTERS]
+    min_skills = {sv: min(len(c["can_do"]) for c in COUNTERS if sv in c["can_do"]) for sv in SERVICES}
+    waiting, i, records = [], 0, []
+    while i < len(people) or waiting:
+        for c in counters:
+            c["free_at"] = _skip_closed(c["free_at"], c["name"], closures)
+        # specialists choose first on ties, so quick jobs don't clog flexible counters
+        c = min(counters, key=lambda c: (c["free_at"], len(c["can_do"])))
+        t = c["free_at"]
+        while i < len(people) and people[i]["arrive"] <= t:
+            waiting.append(people[i]); i += 1
+        cand = [p for p in waiting if p["service"] in c["can_do"]]
+        if not cand:  # idle until the next arrival
+            c["free_at"] = people[i]["arrive"] if i < len(people) else float("inf")
+            if all(x["free_at"] == float("inf") for x in counters):
+                break
+            continue
+
+        def score(p):
+            mismatch = SKILL_COST * (len(c["can_do"]) - min_skills[p["service"]])
+            bonus = PRIORITY_BONUS if use_priority and p.get("priority") else 0
+            return (t - p["arrive"]) * AGING + bonus - mismatch
+        p = max(cand, key=score)
+        waiting.remove(p)
+        c["free_at"] = t + p["duration"]
+        c["busy"] += p["duration"]
+        records.append({"p": p, "start": t, "end": t + p["duration"], "counter": c["name"]})
+    return _metrics(records, counters)
+
+
+# ---------- 4c. METRICS (shared) ----------
+def _metrics(records, counters):
+    waits = [r["start"] - r["p"]["arrive"] for r in records]
+    total_time = max(r["end"] for r in records)
+    sw = sorted(waits)
     out = {
         "avg_wait": sum(waits) / len(waits),
         "max_wait": max(waits),
+        "p95_wait": sw[int(0.95 * (len(sw) - 1))],
+        # Jain's fairness index on waits (+1 min so zero waits don't divide by zero):
+        # 1.0 = everyone waited equally, lower = some people wait much longer than others
+        "jain_fairness": (sum(w + 1 for w in waits) ** 2) / (len(waits) * sum((w + 1) ** 2 for w in waits)),
         "utilisation": {c["name"]: round(100 * c["busy"] / total_time) for c in counters},
+        "_records": records,
     }
+    prio = [w for w, r in zip(waits, records) if r["p"].get("priority")]
     if prio:
+        norm = [w for w, r in zip(waits, records) if not r["p"].get("priority")]
         out["avg_wait_priority"] = sum(prio) / len(prio)
         out["avg_wait_normal"] = sum(norm) / len(norm)
+    return out
+
+
+def timeline(result, step=5):
+    """People waiting (arrived, not yet started) every `step` minutes, total and per counter."""
+    recs = result["_records"]
+    end = max(r["end"] for r in recs)
+    names = [c["name"] for c in COUNTERS]
+    out = []
+    for t in range(0, int(end) + step, step):
+        w = [r for r in recs if r["p"]["arrive"] <= t < r["start"]]
+        serving = {n: any(r["counter"] == n and r["start"] <= t < r["end"] for r in recs) for n in names}
+        out.append({"t": t, "waiting": len(w),
+                    "queues": {n: sum(1 for r in w if r["counter"] == n) for n in names},
+                    "serving": serving})
     return out
 
 
