@@ -1,0 +1,23 @@
+{
+  "days_train": 183,
+  "days_test": 123,
+  "mu_calls_per_agent_min": 0.315,
+  "busy_starts_tested": 3906,
+  "queue_forecast_mae_60min": {
+    "physics": 6.19,
+    "data": 2.73,
+    "hybrid": 3.09,
+    "naive_persistence": 3.17
+  },
+  "hangups_next_hour_abs_error": {
+    "physics (always 0)": 27.08,
+    "hybrid": 21.58,
+    "naive (last hour's rate)": 14.0
+  },
+  "learned_hangup_rate_per_min": {
+    "q=3": 0.1434,
+    "q=6": 0.1473,
+    "q=10": 0.1525
+  },
+  "measured_hangup_rate_per_min": 0.156
+}
