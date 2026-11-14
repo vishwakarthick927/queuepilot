@@ -13,5 +13,8 @@
 | F4 | Panel "Staffing plan": servers per 30-min block from /forecast | WIN | Done |
 | E6 | Priority users (priority_share), served first by QueuePilot | MAIN | Done |
 | E7 | tests/test_engine.py sanity checks (run after every change) | MAIN | Done |
+| E8 | Late binding: one pooled virtual queue, score = aging + priority − skill mismatch (WIN proposal 1) | MAIN | In progress |
+| E9 | Fairness metrics p95 + Jain index (WIN proposal 4) | MAIN | In progress |
+| E10 | trace timeline for animation (WIN proposal 5) | MAIN | In progress |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |
