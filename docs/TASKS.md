@@ -20,5 +20,7 @@
 | F6 | Plan panel v2: staffing_comparison (same staff-minutes, peak 25→18), drop 57% claim | WIN | Done |
 | F7 | Live replay: side-by-side animation from trace timeline, shortest line vs pooled | WIN | Done |
 | R1 | research/: physics-guided DEEP model (PyTorch) + sector embedding, few-shot new sector, MC uncertainty, stability bound = our research-gap contribution (standalone MVP) | WIN | In progress |
+| E11 | Fix residual: features [q, q²/10], clip [−q, 0]; no-abandon test (REVIEW #2) | MAIN | In progress |
+| E12 | Stable baseline (gap 2.5, n 300) + stress preset; mean ± 95% CI, win rate, per-service waits (REVIEW #1,#4,#5) | MAIN | In progress |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |
