@@ -1,0 +1,103 @@
+{
+  "forecast_mae_people": {
+    "Physics only": {
+      "Seen sectors, seen staffing": 2.38,
+      "Seen sectors, UNDERSTAFFED (never seen)": 5.17,
+      "DEMAND SURGE x1.5 (never seen)": 7.0,
+      "WHOLE DAY, 480 min ahead": 1.86,
+      "NEW sector: EV charging (fit on 1 day)": 2.47
+    },
+    "Pure deep learning": {
+      "Seen sectors, seen staffing": 2.23,
+      "Seen sectors, UNDERSTAFFED (never seen)": 3.4,
+      "DEMAND SURGE x1.5 (never seen)": 3.46,
+      "WHOLE DAY, 480 min ahead": 1.82,
+      "NEW sector: EV charging (fit on 1 day)": 1.66
+    },
+    "Hybrid, unconstrained": {
+      "Seen sectors, seen staffing": 2.23,
+      "Seen sectors, UNDERSTAFFED (never seen)": 3.01,
+      "DEMAND SURGE x1.5 (never seen)": 3.35,
+      "WHOLE DAY, 480 min ahead": 1.83,
+      "NEW sector: EV charging (fit on 1 day)": 1.67
+    },
+    "QueuePilot-PGDL (ours)": {
+      "Seen sectors, seen staffing": 2.26,
+      "Seen sectors, UNDERSTAFFED (never seen)": 3.15,
+      "DEMAND SURGE x1.5 (never seen)": 3.63,
+      "WHOLE DAY, 480 min ahead": 1.88,
+      "NEW sector: EV charging (fit on 1 day)": 1.6
+    }
+  },
+  "stability_check": {
+    "Pure deep learning": {
+      "impossible_steps": 0,
+      "steps_checked": 15660
+    },
+    "Hybrid, unconstrained": {
+      "impossible_steps": 0,
+      "steps_checked": 15660
+    },
+    "QueuePilot-PGDL (ours)": {
+      "impossible_steps": 0,
+      "steps_checked": 15660
+    }
+  },
+  "coverage_90pct_band_new_sector": {
+    "QueuePilot-PGDL (ours)": {
+      "coverage": 0.868,
+      "avg_band_width_people": 4.4
+    },
+    "Physics-only simulation": {
+      "coverage": 0.94,
+      "avg_band_width_people": 8.7
+    }
+  },
+  "leave_prob_at_wait_eq_patience": {
+    "office": {
+      "learned": 0.054,
+      "true": 0.05
+    },
+    "hospital": {
+      "learned": 0.046,
+      "true": 0.05
+    },
+    "bank": {
+      "learned": 0.042,
+      "true": 0.05
+    },
+    "ev_charging": {
+      "learned": 0.058,
+      "true": 0.05
+    }
+  },
+  "setup": {
+    "train_sectors": [
+      "office",
+      "hospital",
+      "bank"
+    ],
+    "new_sector": "ev_charging",
+    "train_days_per_sector": 12,
+    "new_sector_days": 1,
+    "horizon_min": 60,
+    "ensemble": 5
+  },
+  "sample_efficiency_surge_mae": {
+    "Pure deep learning": {
+      "1 day(s)/sector": 5.47,
+      "3 day(s)/sector": 4.0,
+      "12 day(s)/sector": 3.46
+    },
+    "Hybrid, unconstrained": {
+      "1 day(s)/sector": 5.59,
+      "3 day(s)/sector": 3.64,
+      "12 day(s)/sector": 3.35
+    },
+    "QueuePilot-PGDL (ours)": {
+      "1 day(s)/sector": 5.58,
+      "3 day(s)/sector": 4.4,
+      "12 day(s)/sector": 3.75
+    }
+  }
+}
