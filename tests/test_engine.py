@@ -67,6 +67,22 @@ def test_pooled_wins_most_seeds_stable_load():
     assert wins >= 36  # >= 90% of crowds
 
 
+def test_ev_queuepilot_beats_baseline_and_meets_need():
+    from engine import ev
+    b = [ev.simulate(ev.make_cars(seed=s), "baseline") for s in range(20)]
+    q = [ev.simulate(ev.make_cars(seed=s), "queuepilot") for s in range(20)]
+    assert st.mean(r["avg_wait"] for r in q) < st.mean(r["avg_wait"] for r in b)
+    assert all(r["need_met"] == 1.0 for r in q)  # nobody leaves without the charge their trip needs
+
+
+def test_waterfill_respects_site_cap():
+    from engine import ev
+    cars = [{"id": i, "soc": s} for i, s in enumerate([0.2, 0.85, 0.95, 0.5])]
+    alloc = ev.split_waterfill(cars, ev.SITE_CAP, 1.0)
+    assert sum(alloc.values()) <= ev.SITE_CAP + 1e-6
+    assert all(alloc[c["id"]] <= ev.accept_power(c["soc"]) + 1e-6 for c in cars)
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):

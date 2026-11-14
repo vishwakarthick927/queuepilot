@@ -88,3 +88,17 @@ def forecast():
         "staffing_plan": ph.recommend_staffing(_model),
         "staffing_comparison": ph.compare_staffing(_model),
     }
+
+
+# ---------- EV charging hub (engine/ev.py) ----------
+from engine import ev as evsim
+
+
+@app.get("/ev")
+def ev(runs: int = 80, temp: float = 1.0, avg_gap: float = 18.0):
+    """Battery-physics queue: 4 stalls x 60 kW, 150 kW site cap. temp < 1 = heat derating."""
+    return {"config": {"stalls": evsim.STALLS, "stall_kw": evsim.P_STALL, "site_cap_kw": evsim.SITE_CAP,
+                       "battery_kwh": evsim.E_BATT, "avg_gap_min": avg_gap, "temp_factor": temp},
+            "charge_curve": [{"soc": round(x / 100, 2), "kw": round(evsim.accept_power(x / 100, temp), 1)}
+                             for x in range(0, 101, 5)],
+            "results": evsim.compare(runs, temp, avg_gap)}

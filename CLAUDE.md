@@ -41,6 +41,13 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 - C2 closed 60–150: 10.0 → 7.4. 10% priority: priority people 7.3 → 2.3 min.
 - Stress preset: 16.5 → 14.6 (pooled wins 94%). Do not quote stress numbers as the headline.
 
+## Flagship use case: EV fast-charging hubs (docs/USE_CASE_EV.md, engine/ev.py)
+Service time set by battery physics: dSOC/dt = P/E, CC-CV taper above 80% SOC, shared 150 kW site cap over 4×60 kW stalls.
+QueuePilot-EV: water-filling power split + dynamic 80% cap while cars wait (never below trip need) + pooled queue.
+80 busy days: avg wait 47.7 → 11.9 min (−75%), time at hub 113 → 66 min, trip need met 100%. Ablation: water-filling alone −37%.
+GET /ev?runs=80&temp=1.0&avg_gap=18 → {"config": {...}, "charge_curve": [{"soc":0.0,"kw":60.0}, ...],
+ "results": {"baseline"|"waterfill_only"|"cap_only"|"queuepilot": {"served","avg_wait","max_wait","avg_time_in_system","energy_kwh","need_met","avg_final_soc","avg_wait_ci95"}, "labels": {...}}}
+
 ## Repo layout & ownership
 | Path | Owner | Notes |
 |---|---|---|
@@ -82,6 +89,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 20:40 [MAIN] — E13: EV charging hub use case (battery-physics queue), engine/ev.py, GET /ev, docs/USE_CASE_EV.md. Wait −75%. 11 tests pass.
 - 14 Nov 20:15 [MAIN] — E11+E12 (REVIEW #1,#2,#4,#5): constrained residual, hybrid 1.8 vs physics 4.3; stable "normal" preset default; pooled 7.1→5.0 min (−30%, wins 100% of crowds); CI, win rate, per-service waits in /simulate. 9 tests pass.
 - 14 Nov 19:15 [WIN] — F5–F7 done: 3 strategies + p95 + Jain, priority slider + callout, staffing_comparison, 04 Replay (side-by-side animation + scrubber from timeline), URL scenarios (?close=C2&priority=10&t=22), per-panel error boundary. Build + lint clean, checked at 1440 and 500 px.
 - 14 Nov 18:25 [MAIN] — E8–E10 done (WIN proposals 1,4,5): pooled late-binding strategy, p95 + Jain fairness, trace timeline. Pooled vs shortest line: avg 16.5→14.6, max 120→93, p95 84→67.
