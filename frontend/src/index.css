@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Design tokens: one place to change the look. */
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-bg: #07090d;
+  --color-panel: #0c1016;
+  --color-raised: #121821;
+  --color-line: #1c2430;
+  --color-line-strong: #2a3443;
+  --color-ink: #e6edf3;
+  --color-dim: #8b98a9;
+  --color-faint: #5a6677;
+
+  --color-qp: #3ddc84;       /* QueuePilot / hybrid: the hero colour */
+  --color-base: #f2a541;     /* baseline / physics-only */
+  --color-data: #f06a6a;     /* pure data model */
+  --color-alert: #ff5d5d;
+}
+
+html, body { background: var(--color-bg); color: var(--color-ink); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+/* Faint engineering grid behind everything. */
+body {
+  background-image:
+    linear-gradient(var(--color-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+  background-attachment: fixed;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, transparent 0%, var(--color-bg) 70%);
+}
+#root { position: relative; }
+
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+input[type="range"] { accent-color: var(--color-qp); }
+
+:focus-visible { outline: 2px solid var(--color-qp); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+}

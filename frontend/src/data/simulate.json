@@ -1,0 +1,1 @@
+{"fcfs":{"avg_wait":16.5,"max_wait":119.9,"utilisation":{"C1":97,"C2":92,"C3":59,"C4":15}},"queuepilot":{"avg_wait":15.0,"max_wait":103.0,"utilisation":{"C1":92,"C2":91,"C3":71,"C4":22}}}
