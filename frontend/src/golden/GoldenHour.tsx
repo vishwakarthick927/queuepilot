@@ -278,7 +278,7 @@ export default function GoldenHour() {
       </div>
       <footer className="num mt-4 flex flex-wrap justify-between gap-2 text-[11px] text-faint">
         <span>Same calls in all three worlds · simulated city · physics-guided deep learning after Yu &amp; Wang, PNAS 2024</span>
-        <a href="?view=engine" className="hover:text-ink">Engine room →</a>
+        <a href="/" className="hover:text-ink">Flood Twin →</a>
       </footer>
     </div>
   )

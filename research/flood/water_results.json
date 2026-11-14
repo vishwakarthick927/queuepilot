@@ -1,0 +1,47 @@
+{
+  "Unseen storms, 2 h ahead": {
+    "Physics only": {
+      "flooded_cells_caught_pct": 71.7,
+      "false_alarm_pct": 0.0,
+      "depth_error_cm": 1.2
+    },
+    "AI only (CNN)": {
+      "flooded_cells_caught_pct": 93.0,
+      "false_alarm_pct": 9.7,
+      "depth_error_cm": 0.85
+    },
+    "Physics + AI (ours)": {
+      "flooded_cells_caught_pct": 99.7,
+      "false_alarm_pct": 0.2,
+      "depth_error_cm": 0.04
+    }
+  },
+  "District never seen in training (east), 2 h ahead": {
+    "Physics only": {
+      "flooded_cells_caught_pct": 50.9,
+      "false_alarm_pct": 0.0,
+      "depth_error_cm": 1.2
+    },
+    "AI only (CNN)": {
+      "flooded_cells_caught_pct": 94.1,
+      "false_alarm_pct": 85.1,
+      "depth_error_cm": 2.67
+    },
+    "Physics + AI (ours)": {
+      "flooded_cells_caught_pct": 94.4,
+      "false_alarm_pct": 3.7,
+      "depth_error_cm": 0.11
+    }
+  },
+  "learned_drain_efficiency_error": 0.07,
+  "setup": {
+    "grid": [
+      40,
+      28
+    ],
+    "cell_km": 0.5,
+    "step_min": 5,
+    "train_storms": 20,
+    "test_storms": 12
+  }
+}

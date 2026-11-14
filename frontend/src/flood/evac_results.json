@@ -1,0 +1,27 @@
+{
+  "Today (react when water arrives)": {
+    "people_in_flooding_areas": 66400,
+    "people_trapped": 42300,
+    "needless_evacuations": 17500,
+    "worst_shelter_wait_min": 15.3,
+    "first_departure_after_min": 187.0
+  },
+  "Physics forecast only": {
+    "people_in_flooding_areas": 66400,
+    "people_trapped": 42100,
+    "needless_evacuations": 0,
+    "worst_shelter_wait_min": 3.8,
+    "first_departure_after_min": 170.0
+  },
+  "Physics + AI forecast (ours)": {
+    "people_in_flooding_areas": 66400,
+    "people_trapped": 0,
+    "needless_evacuations": 0,
+    "worst_shelter_wait_min": 8.3,
+    "first_departure_after_min": 90.0
+  },
+  "setup": {
+    "storms": 12,
+    "assumption": "rain for the next 3 hours is known (weather-radar nowcast)"
+  }
+}

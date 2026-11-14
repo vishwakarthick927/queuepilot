@@ -3,12 +3,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import GoldenHour from './golden/GoldenHour.tsx'
+import FloodTwin from './flood/FloodTwin.tsx'
 
-// "/" = the Golden Hour demo; "/?view=engine" = the engine room (queue dashboard).
-const engine = new URLSearchParams(window.location.search).get('view') === 'engine'
+// "/" = the Flood Twin (hero) · "?view=golden" = Golden Hour · "?view=engine" = the queue engine room
+const view = new URLSearchParams(window.location.search).get('view')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {engine ? <App /> : <GoldenHour />}
+    {view === 'engine' ? <App /> : view === 'golden' ? <GoldenHour /> : <FloodTwin />}
   </StrictMode>,
 )

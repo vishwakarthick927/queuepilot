@@ -8,3 +8,5 @@ dist/
 # Anonymous Bank raw data (~58 MB extracted + 10.6 MB rar); results JSON stays tracked
 data/anonymous_bank/
 research/golden/radar_data.json
+research/flood/*.pt
+research/flood/*.npy
