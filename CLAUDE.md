@@ -20,11 +20,12 @@ Yu & Wang, "Learning dynamical systems from data: An introduction to physics-gui
 Their point: physics-only models are rigid; pure deep learning needs lots of data and breaks physical laws. Hybrid = physics structure + learned residual.
 Our use (engine/physics.py):
 - Physics: conservation law of the queue, dq/dt = arrivals − μ·servers, q ≥ 0 (fluid queue ODE).
-- Learned residual: what physics misses (people abandoning long lines). Ridge regression now; swappable for a small neural net.
-- Physics constraint on the learned part: the residual can never remove more people than are waiting.
-- Tested under distribution shift (staffing never seen in training): 60-min forecast error, physics 4.3, pure data 10.6, hybrid 3.0 people.
+- Learned residual: what physics misses (people abandoning long lines). Features [q, q²/10] only (abandonment-shaped). Ridge regression; swappable for an MLP. Do NOT call it deep learning.
+- Physics constraint on the learned part: residual clipped to [−q, 0], it can only remove people who are waiting (paper §3A: unconstrained residuals get too flexible).
+- Tested under distribution shift (staffing never seen in training): 60-min forecast error, physics 4.3, pure data 10.6, hybrid 1.8 people.
+- Control test, no abandonment at all: physics 3.8, hybrid 4.3 (learned part stays nearly harmless), pure data 69.
 - Decision layer: staffing plan per 30-min block via Little's law (W = queue / throughput) to keep wait ≤ 5 min.
-- Same staff-hours, spent by the forecast instead of evenly: avg queue 6.2 → 5.3 (−15%), peak queue 25 → 18 (−27%).
+- Same staff-hours, time-varying plan vs even: avg queue 4.8 → 3.4, peak 23.6 → 15.9. HONEST: most of this gain is from time-varying staffing, not the forecast itself (REVIEW #3). Erlang-C guarantee is the planned fix (PLAN #4).
 
 Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (allocation).
 
@@ -35,7 +36,10 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 - QueuePilot route-on-arrival: among capable counters, pick lowest (estimated free time + SKILL_COST × extra skills). Uses only ESTIMATED durations.
 - QueuePilot pooled (best): one virtual queue; when a counter frees it takes the waiting person with max score = wait·AGING + priority bonus − skill mismatch. Pooling beats separate lines (M/M/c vs c×M/M/1).
 - Simulation: start = max(arrival, counter free_at); wait = start − arrival. Compare avg wait, max wait, utilisation, averaged over many seeds.
-- Result so far: QueuePilot ~10–17% lower average wait.
+- Presets: "normal" = stable load (n 300, gap 2.5 min), the demo default. "stress" = 125% certificate load (n 150, gap 1.6), shown separately as overload.
+- Results, normal preset, 100 crowds, mean ± 95% CI: shortest line 7.1 ± 0.9, route-on-arrival 5.6 ± 0.8 (wins 97% of crowds), pooled 5.0 ± 0.8 (−30%, wins 100%). Per service, certificates 25.0 → 17.7 min.
+- C2 closed 60–150: 10.0 → 7.4. 10% priority: priority people 7.3 → 2.3 min.
+- Stress preset: 16.5 → 14.6 (pooled wins 94%). Do not quote stress numbers as the headline.
 
 ## Repo layout & ownership
 | Path | Owner | Notes |
@@ -49,21 +53,23 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
 
 ## JSON contract (do not change field names without updating this file)
-POST /simulate  body: {"n_people": 150, "runs": 100, "closures": {"C2": [[60, 150]]}, "priority_share": 0.1}   # closures, priority_share optional
+POST /simulate  body: {"preset": "normal", "runs": 100, "closures": {"C2": [[60, 150]]}, "priority_share": 0.1}   # all optional; preset "normal"|"stress"; n_people overrides preset
 Optional "trace": true → each strategy also gets "timeline": [{"t":0,"waiting":3,"queues":{"C1":1,...},"serving":{"C1":true,...}}, ...] every 5 min, one crowd (seed 0).
 Response: three strategies + labels. With priority_share > 0 each also has "avg_wait_priority", "avg_wait_normal".
 {"fcfs":       {"avg_wait": 16.5, "max_wait": 119.9, "p95_wait": 84.2, "jain_fairness": 0.27, "utilisation": {...}},
  "queuepilot": {"avg_wait": 15.0, "max_wait": 103.0, "p95_wait": 68.5, "jain_fairness": 0.31, "utilisation": {...}},
  "pooled":     {"avg_wait": 14.6, "max_wait": 92.7,  "p95_wait": 66.7, "jain_fairness": 0.32, "utilisation": {...}},
  "labels": {"fcfs": "Shortest line (what people do today)", "queuepilot": "QueuePilot route-on-arrival", "pooled": "QueuePilot pooled virtual queue (late binding)"}}
-Times in minutes, utilisation in %. (100-run averages, n_people 150.)
+Times in minutes, utilisation in %. NUMBERS ABOVE ARE OLD (stress load); see "How it works" for normal-preset results.
+New per-strategy keys: "wait_by_service" {id_card, fee_query, certificate}, "avg_wait_ci95" (mean ± this), "win_rate_vs_fcfs" (share of crowds beaten). Top-level "preset": {name, n_people, avg_gap}.
 For pooled the per-counter "queues" in timeline are 0 (nobody is bound to a counter); use "waiting".
 
 GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 3.01},
  "example": {"minutes": [...60], "actual": [...], "physics": [...], "data": [...], "hybrid": [...]},
- "staffing_plan": [2,4,7,7,4,2,2,2,3,4,5,5,4,3,2,2],   # servers per 30-min block, 8-hour day
- "staffing_comparison": {"fixed": {"avg_queue": 6.2, "peak_queue": 25.0, "avg_wait_min": 6.3, "staff_minutes": 1740},
-                         "planned": {"avg_queue": 5.3, "peak_queue": 18.3, "avg_wait_min": 5.4, "staff_minutes": 1740}}}
+ "staffing_plan": [3,4,7,7,5,3,3,3,3,4,6,6,4,4,3,3],   # servers per 30-min block, 8-hour day
+ "staffing_comparison": {"fixed": {"avg_queue": 4.8, "peak_queue": 23.6, "avg_wait_min": 4.9, "staff_minutes": 2040},
+                         "planned": {"avg_queue": 3.4, "peak_queue": 15.9, "avg_wait_min": 3.4, "staff_minutes": 2040}}}
+ forecast_error is now {"physics": 4.32, "data": 10.59, "hybrid": 1.8}
 
 ## Constraint cheat sheet
 - New service/counter → SERVICES / COUNTERS in engine/simulation.py
@@ -76,6 +82,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 20:15 [MAIN] — E11+E12 (REVIEW #1,#2,#4,#5): constrained residual, hybrid 1.8 vs physics 4.3; stable "normal" preset default; pooled 7.1→5.0 min (−30%, wins 100% of crowds); CI, win rate, per-service waits in /simulate. 9 tests pass.
 - 14 Nov 19:15 [WIN] — F5–F7 done: 3 strategies + p95 + Jain, priority slider + callout, staffing_comparison, 04 Replay (side-by-side animation + scrubber from timeline), URL scenarios (?close=C2&priority=10&t=22), per-panel error boundary. Build + lint clean, checked at 1440 and 500 px.
 - 14 Nov 18:25 [MAIN] — E8–E10 done (WIN proposals 1,4,5): pooled late-binding strategy, p95 + Jain fairness, trace timeline. Pooled vs shortest line: avg 16.5→14.6, max 120→93, p95 84→67.
 - 14 Nov 17:30 [WIN] — F1–F4 done: frontend/ React+Vite+TS+Tailwind dashboard (Forecast, Plan, Route with live closure toggles + sliders). Run: cd frontend && npm i && npm run dev. Falls back to saved real API responses if backend is down.

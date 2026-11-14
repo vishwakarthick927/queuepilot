@@ -52,6 +52,21 @@ def test_timeline_shape():
     assert tl[0]["t"] == 0 and "waiting" in tl[0] and "C1" in tl[0]["queues"]
 
 
+def test_hybrid_harmless_without_abandonment():
+    steady = np.full(480, 6)
+    shifted = np.where(np.arange(480) < 240, 4, 7)
+    train = [(ph.arrival_profile(), steady, ph.real_world_day(steady, seed=s, abandon=0)[1]) for s in (1, 2)]
+    test = [(ph.arrival_profile(), shifted, ph.real_world_day(shifted, seed=s, abandon=0)[1]) for s in (10, 11)]
+    err = ph.evaluate(ph.fit(train), test)
+    assert err["hybrid"] <= err["physics"] + 1.0  # learned part must not wreck a correct physics model
+
+
+def test_pooled_wins_most_seeds_stable_load():
+    wins = sum(sim.simulate_pooled(sim.make_people(seed=s))["avg_wait"] <
+               sim.simulate(sim.make_people(seed=s), sim.pick_shortest_line)["avg_wait"] for s in range(40))
+    assert wins >= 36  # >= 90% of crowds
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):

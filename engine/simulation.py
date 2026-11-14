@@ -27,7 +27,15 @@ COUNTERS = [
 
 
 # ---------- 2. GENERATE FAKE PEOPLE ----------
-def make_people(n=150, avg_gap=1.6, seed=42, priority_share=0.0):
+PRESETS = {
+    # stable: offered load fits capacity (certificates ~80% of C1+C2), so waits settle
+    "normal": {"n": 300, "avg_gap": 2.5},
+    # stress: 125% load on certificates, the system is overloaded and waits keep growing
+    "stress": {"n": 150, "avg_gap": 1.6},
+}
+
+
+def make_people(n=300, avg_gap=2.5, seed=42, priority_share=0.0):
     """Random arrivals. avg_gap = average minutes between two people arriving.
     priority_share = fraction of people who are priority (elderly, emergency)."""
     prio_rng = random.Random(seed + 10_000)  # separate stream: same crowd with or without priority
@@ -166,6 +174,9 @@ def _metrics(records, counters):
         # 1.0 = everyone waited equally, lower = some people wait much longer than others
         "jain_fairness": (sum(w + 1 for w in waits) ** 2) / (len(waits) * sum((w + 1) ** 2 for w in waits)),
         "utilisation": {c["name"]: round(100 * c["busy"] / total_time) for c in counters},
+        "wait_by_service": {sv: (sum(w for w, r in zip(waits, records) if r["p"]["service"] == sv) /
+                                 max(1, sum(1 for r in records if r["p"]["service"] == sv)))
+                            for sv in SERVICES},
         "_records": records,
     }
     prio = [w for w, r in zip(waits, records) if r["p"].get("priority")]

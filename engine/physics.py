@@ -48,7 +48,15 @@ def real_world_day(servers, seed, abandon=0.03):
 
 # ---------- three models ----------
 def features(q, lam, s):
+    """Features for the pure-data model (it has to learn everything)."""
     return np.stack([q, q ** 2 / 10, lam, s, np.ones_like(q)], axis=1)
+
+
+def resid_features(q):
+    """Features for the learned residual: only the queue itself, shaped like abandonment
+    (more people waiting -> more give up). No intercept, no staffing term, so the learned
+    part can only explain people LEAVING, never invent arrivals."""
+    return np.stack([q, q ** 2 / 10], axis=1)
 
 
 def physics_step(q, lam, s):
@@ -57,14 +65,16 @@ def physics_step(q, lam, s):
 
 def fit(train_days):
     """Fit the pure-data model and the hybrid residual on the same training data."""
-    X, y_next, y_resid = [], [], []
+    X, R, y_next, y_resid = [], [], [], []
     for lam, s, q in train_days:
         X.append(features(q[:-1], lam, s))
+        R.append(resid_features(q[:-1]))
         y_next.append(q[1:])
         y_resid.append(q[1:] - (q[:-1] + lam - MU * s))  # what physics got wrong
-    X, y_next, y_resid = np.vstack(X), np.concatenate(y_next), np.concatenate(y_resid)
+    X, R = np.vstack(X), np.vstack(R)
+    y_next, y_resid = np.concatenate(y_next), np.concatenate(y_resid)
     ridge = lambda X, y: np.linalg.solve(X.T @ X + 1e-2 * np.eye(X.shape[1]), X.T @ y)
-    return {"data_w": ridge(X, y_next), "resid_w": ridge(X, y_resid)}
+    return {"data_w": ridge(X, y_next), "resid_w": ridge(R, y_resid)}
 
 
 def rollout(kind, q0, lam, s, model=None, horizon=60):
@@ -79,7 +89,8 @@ def rollout(kind, q0, lam, s, model=None, horizon=60):
         else:  # hybrid
             # physics constraint on the learned part: the residual can remove at most
             # the people already waiting (nobody leaves who isn't there)
-            r = float(np.clip((f @ model["resid_w"])[0], -q, 1.0))
+            # constraint: the residual is in [-q, 0], it can only remove people who are waiting
+            r = float(np.clip((resid_features(np.array([q])) @ model["resid_w"])[0], -q, 0.0))
             q = max(0.0, q + lam[t] - MU * s[t] + r)
         out.append(q)
     return np.array(out)
