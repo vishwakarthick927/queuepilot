@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CITY, CRASH, GOLDEN, MINUTES, clock, simulate, snapshot, summary, type Policy } from './sim'
+import { CITY, CRASH, GOLDEN, MINUTES, clock, simulate, snapshot, summary, type Patient, type Policy } from './sim'
+import { RADAR_RESULTS, radar } from './radar'
+
+const RADAR_ALERT = 8   // AI expects 8+ people waiting in 30 min -> raise an alert
 
 const SCALE = 46                       // px per km on the map
 const W = CITY.w * SCALE, H = CITY.h * SCALE
@@ -21,7 +24,10 @@ export default function GoldenHour() {
   // Both worlds are simulated once, from the same calls.
   const runs = useMemo(() => ({ nearest: simulate('nearest'), queuepilot: simulate('queuepilot') }), [])
   const finals = useMemo(() => ({ nearest: summary(runs.nearest), queuepilot: summary(runs.queuepilot) }), [runs])
+  const alerts = useMemo(() => ({ nearest: alertLog(runs.nearest, 'nearest'), queuepilot: alertLog(runs.queuepilot, 'queuepilot') }), [runs])
   const snap = snapshot(runs[policy], t)
+  const radars = snap.hospitals.map((h) => radar(h, snap.calls15, t))
+  const feed = alerts[policy].filter((a) => a.t <= t).slice(-4).reverse()
   const other = snapshot(runs[policy === 'nearest' ? 'queuepilot' : 'nearest'], t)
 
   useEffect(() => {
@@ -40,10 +46,15 @@ export default function GoldenHour() {
       {/* ---------- header ---------- */}
       <header className="flex flex-wrap items-center justify-between gap-4 pb-5">
         <div>
-          <div className="num text-[11px] tracking-[0.2em] text-faint">QUEUEPILOT · GOLDEN HOUR</div>
+          <div className="num text-[11px] tracking-[0.2em] text-faint">QUEUEPILOT · CITY EMERGENCY BRAIN</div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">
             Send every patient where they'll be <span style={{ color: 'var(--color-qp)' }}>treated</span> first, not where's closest.
           </h1>
+          <div className="num mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[11px] tracking-wider text-dim">
+            <span><span className="text-qp">01 ROUTE</span> every ambulance to the fastest treatment</span>
+            <span><span className="text-qp">02 RADAR</span> AI sees ER overflow 30 min early</span>
+            <span><span className="text-qp">03 AUTOPILOT</span> acts before it happens</span>
+          </div>
         </div>
         <div className="flex items-center gap-2 border border-line-strong p-1" role="tablist" aria-label="Routing policy">
           {(['nearest', 'queuepilot'] as Policy[]).map((p) => (
@@ -57,7 +68,7 @@ export default function GoldenHour() {
 
       <div className="grid flex-1 gap-5 lg:grid-cols-[1fr_340px]">
         {/* ---------- the city ---------- */}
-        <div className="relative border border-line bg-panel">
+        <div className="relative self-start border border-line bg-panel">
           <div className="num absolute left-4 top-3 z-10 flex items-baseline gap-3">
             <span className="text-3xl text-ink">{clock(t)}</span>
             <span className="text-xs text-faint">{snap.ambulances.length} ambulances on the road</span>
@@ -88,12 +99,20 @@ export default function GoldenHour() {
             ))}
 
             {/* hospitals */}
-            {snap.hospitals.map((h) => {
+            {snap.hospitals.map((h, i) => {
               const risk = h.forecastWait >= GOLDEN / 2 ? 'alert' : h.forecastWait >= 15 ? 'base' : 'line-strong'
               const x = h.x * SCALE, y = h.y * SCALE
               return (
                 <g key={h.id} transform={`translate(${x},${y})`}>
                   {risk === 'alert' && <circle r="44" fill="var(--color-alert)" opacity="0.14"><animate attributeName="r" values="38;48;38" dur="1.6s" repeatCount="indefinite" /></circle>}
+                  {radars[i].forecast >= RADAR_ALERT && (
+                    <g>
+                      <circle r="58" fill="none" stroke="var(--color-route)" strokeWidth="1.5" strokeDasharray="4 5">
+                        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite" />
+                      </circle>
+                      <text y="72" textAnchor="middle" className="num" fontSize="11" fill="var(--color-route)">AI: {Math.round(radars[i].forecast)} waiting in 30 min</text>
+                    </g>
+                  )}
                   <rect x="-22" y="-22" width="44" height="44" fill="var(--color-bg)" stroke={`var(--color-${risk})`} strokeWidth="2" />
                   <path d="M-6,0 H6 M0,-6 V6" stroke="var(--color-ink)" strokeWidth="2.5" />
                   {/* one tick per doctor: lit = treating someone */}
@@ -132,30 +151,52 @@ export default function GoldenHour() {
           </div>
 
           <div className="border border-line bg-panel p-5">
-            <div className="text-sm text-dim">Forecast wait for the next patient</div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-dim"><span className="num text-route">RADAR</span> · waiting now → in 30 min</span>
+              <span className="num shrink-0 text-[10px] text-faint">PHYSICS + AI</span>
+            </div>
             <div className="mt-3 space-y-2.5">
-              {snap.hospitals.map((h) => {
-                const pct = Math.min(1, h.forecastWait / GOLDEN)
-                const c = h.forecastWait >= GOLDEN / 2 ? 'var(--color-alert)' : h.forecastWait >= 15 ? 'var(--color-base)' : 'var(--color-dim)'
+              {snap.hospitals.map((h, i) => {
+                const r = radars[i], max = 20
+                const hot = r.forecast >= RADAR_ALERT
                 return (
-                  <div key={h.id} className="grid grid-cols-[80px_1fr_52px] items-center gap-3">
+                  <div key={h.id} className="grid grid-cols-[76px_1fr_64px] items-center gap-3">
                     <span className="text-sm">{h.name}</span>
-                    <div className="h-1.5 bg-line"><div className="h-full transition-[width] duration-200" style={{ width: `${pct * 100}%`, background: c }} /></div>
-                    <span className="num text-right text-xs" style={{ color: c }}>{Math.round(h.forecastWait)} min</span>
+                    <div className="flex h-1.5 bg-line">
+                      <div style={{ width: `${Math.min(100, ((r.forecast - r.newArrivals) / max) * 100)}%`, background: 'var(--color-dim)' }} />
+                      <div style={{ width: `${Math.min(100, (r.newArrivals / max) * 100)}%`, background: 'var(--color-route)' }} />
+                    </div>
+                    <span className={`num text-right text-xs ${hot ? 'text-route' : 'text-dim'}`}>{h.waiting} → {Math.round(r.forecast)}</span>
                   </div>
                 )
               })}
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-faint">
-              Forecast = everyone waiting or on the way ÷ doctors × treatment time. Red = the golden hour is at risk.
+              Grey = what physics knows (people waiting + ambulances on the way). <span className="text-route">Blue</span> = new patients the neural network expects who have not called yet.
             </p>
           </div>
 
+          <div className="border border-line bg-panel p-5">
+            <div className="text-sm text-dim"><span className="num text-qp">AUTOPILOT</span> · {ours ? 'acting on the radar' : 'today nobody acts'}</div>
+            <ul className="mt-3 space-y-2.5">
+              {feed.length === 0 && <li className="text-xs text-faint">Quiet. Radar shows no ER filling up.</li>}
+              {feed.map((a) => (
+                <li key={a.t + a.h} className="text-xs leading-relaxed">
+                  <span className="num text-faint">{clock(a.t)}</span>{' '}
+                  <span className="text-route">{a.h}</span> <span className="text-dim">expects {a.n} waiting.</span>{' '}
+                  <span className={ours ? 'text-qp' : 'text-base'}>{a.action}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           <div className="border border-line bg-panel p-5 text-xs leading-relaxed text-dim">
-            <span className="text-ink">{ours ? 'QueuePilot' : 'Today'}:</span>{' '}
-            {ours
-              ? 'every ambulance is sent to the hospital where treatment starts soonest = drive time + forecast wait. The crash victims are spread across Central, Ring Road and North.'
-              : 'every ambulance goes to the closest hospital. After the crash, East gets every victim while hospitals 10 minutes away sit half empty.'}
+            <div className="num mb-2 text-[11px] tracking-wider text-faint">THE AI, TESTED ON 150 UNSEEN DAYS</div>
+            When an ER is filling up, physics alone is off by <span className="num text-base">{RADAR_RESULTS['new days']['Physics only'].ER_filling_up}</span> people,
+            physics + AI by <span className="num text-qp">{RADAR_RESULTS['new days']['Physics + AI (ours)'].ER_filling_up}</span>.
+            On a hospital it never saw: <span className="num text-base">{RADAR_RESULTS['hospital never seen (Ring Road)']['Physics only'].ER_filling_up}</span> →{' '}
+            <span className="num text-qp">{RADAR_RESULTS['hospital never seen (Ring Road)']['Physics + AI (ours)'].ER_filling_up}</span>.
+            Unlike a black box, it explains itself: the blue part of each bar is how many new patients it expects.
           </div>
         </aside>
       </div>
@@ -205,4 +246,24 @@ function Legend({ accent }: { accent: string }) {
       <span className="text-alert">red ring = golden hour at risk</span>
     </div>
   )
+}
+
+// Every time the radar first sees an ER heading for 8+ waiting, log it with what each system does.
+function alertLog(ps: Patient[], policy: Policy) {
+  const out: { t: number; h: string; n: number; action: string }[] = []
+  const hot = new Set<string>()
+  for (let t = 0; t < MINUTES; t++) {
+    const snap = snapshot(ps, t)
+    snap.hospitals.forEach((h) => {
+      const n = Math.round(radar(h, snap.calls15, t).forecast)
+      if (n >= RADAR_ALERT && !hot.has(h.id)) {
+        hot.add(h.id)
+        const calm = snap.hospitals.filter((x) => x.id !== h.id && x.waiting === 0).slice(0, 2).map((x) => x.name)
+        out.push({ t, h: h.name, n, action: policy === 'queuepilot'
+          ? `Diverting new ambulances to ${calm.join(' and ') || 'calmer ERs'}; recommend calling in 2 off-duty doctors.`
+          : 'No action. Ambulances keep arriving.' })
+      } else if (n < RADAR_ALERT / 2) hot.delete(h.id)
+    })
+  }
+  return out
 }

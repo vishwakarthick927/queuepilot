@@ -104,8 +104,13 @@ HTML = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Que
 
 <div class="page">
   <div class="tag">ZEROHOUR 2026 · TEAM COUNTER INTELLIGENCE · TRACK 3</div>
-  <h1>QueuePilot: Golden Hour</h1>
-  <p class="lead">An AI that sends every emergency patient to the hospital where a doctor will see them <b>first</b>, not just the one that is <b>closest</b>.</p>
+  <h1>QueuePilot: the City Emergency Brain</h1>
+  <p class="lead">An AI that sees an emergency room overflowing <b>30 minutes before it happens</b>, and sends every patient to the hospital where a doctor will see them <b>first</b>, not just the one that is <b>closest</b>.</p>
+  <div class="kpis">
+    <div><b>01 ROUTE</b><br>every ambulance to the fastest treatment: drive time + waiting time</div>
+    <div><b>02 RADAR</b><br>a physics-guided neural network predicts each ER 30 minutes ahead</div>
+    <div><b>03 AUTOPILOT</b><br>acts on the radar: diverts ambulances, calls in doctors early</div>
+  </div>
 
   <h2>The problem, in one minute</h2>
   <ul>
@@ -119,8 +124,8 @@ HTML = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Que
 
   <h2>What the demo shows (same city, same calls, two ways)</h2>
   <div class="shots">
-    <figure><img src="{img('nearest.png')}"><figcaption><b>Today (nearest hospital):</b> 17:20, the crash victims all went to East. 23 people waiting, forecast wait 200 min.</figcaption></figure>
-    <figure><img src="{img('queuepilot.png')}"><figcaption><b>With QueuePilot:</b> the same victims are spread to Central, Ring Road and North. No hospital overflows.</figcaption></figure>
+    <figure><img src="{img('radar.png')}"><figcaption><b>16:35, five minutes after a bus crash.</b> Nobody is waiting at East yet, but the AI radar already warns: <b>"18 waiting in 30 min"</b>. Today, nobody acts on that.</figcaption></figure>
+    <figure><img src="{img('queuepilot.png')}"><figcaption><b>17:20 with QueuePilot:</b> the victims were spread to Central, Ring Road and North. 8 patients in danger instead of 22.</figcaption></figure>
   </div>
   <div class="kpis">
     <div><div class="big"><span class="o">26</span> → <span class="g">0</span></div>patients who missed the golden hour in one afternoon</div>
@@ -135,6 +140,14 @@ HTML = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Que
   {FLOW}
   <h2>The brain: physics + AI together</h2>
   {MODEL}
+  <table>
+    <tr><th>Radar test (150 days it never saw)</th><th>Error when an ER is filling up<br>(people, 30 min ahead)</th><th>On a hospital it never saw</th><th>Explains its answer?</th></tr>
+    <tr><td>Physics only</td><td class="num">3.95</td><td class="num">4.43</td><td>yes, but too simple</td></tr>
+    <tr><td>AI only (neural network)</td><td class="num">3.17</td><td class="num">3.68</td><td>no, black box</td></tr>
+    <tr><td><b>Physics + AI (ours)</b></td><td class="num"><b>3.21</b></td><td class="num"><b>3.59 (best)</b></td><td><b>yes: "I expect N new patients"</b></td></tr>
+  </table>
+  <p style="font-size:9.5pt;color:#555">Trained on 900 simulated days (223,200 snapshots), tested on 150 new days. The same trained network runs live inside the demo.
+  Honest reading: AI cuts the physics error by about a fifth; ours matches pure AI on known hospitals, is best on a new one, and can explain itself ("I expect N new patients").</p>
   <p>Pure AI can make impossible predictions (like a negative queue) and breaks when something new happens.
   Pure physics is too simple: it does not know people give up and leave, or that every hospital behaves differently.
   We use <b>both</b>, the way the research paper suggests. The AI part is <b>only allowed</b> to do things that are physically possible:

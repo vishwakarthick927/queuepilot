@@ -1,0 +1,42 @@
+{
+  "new days": {
+    "Physics only": {
+      "all": 0.22,
+      "ER_filling_up": 3.95,
+      "negative_predictions": 0
+    },
+    "AI only": {
+      "all": 0.28,
+      "ER_filling_up": 3.17,
+      "negative_predictions": 0
+    },
+    "Physics + AI (ours)": {
+      "all": 0.26,
+      "ER_filling_up": 3.21,
+      "negative_predictions": 0
+    }
+  },
+  "hospital never seen (Ring Road)": {
+    "Physics only": {
+      "all": 0.19,
+      "ER_filling_up": 4.43,
+      "negative_predictions": 0
+    },
+    "AI only": {
+      "all": 0.23,
+      "ER_filling_up": 3.68,
+      "negative_predictions": 0
+    },
+    "Physics + AI (ours)": {
+      "all": 0.22,
+      "ER_filling_up": 3.59,
+      "negative_predictions": 0
+    }
+  },
+  "setup": {
+    "rows": 223200,
+    "train_days": 900,
+    "test_days": 150,
+    "ahead_min": 30
+  }
+}

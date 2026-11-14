@@ -24,7 +24,9 @@ const SPEED = 0.45                            // km per minute in city traffic (
 const ROAD = 1.3                              // roads are ~30% longer than a straight line
 const PICKUP = 8                              // minutes for an ambulance to reach the patient
 const TREAT_MEAN = 25                         // average minutes a doctor spends stabilising a patient
-export const CRASH = { t: 150, x: 15.6, y: 4.6, n: 28, label: 'Bus crash, Outer Ring Road' }
+export type Crash = { t: number; x: number; y: number; n: number; label: string }
+export const CRASH: Crash = { t: 150, x: 15.6, y: 4.6, n: 28, label: 'Bus crash, Outer Ring Road' }
+
 
 export type Patient = {
   id: number; t0: number; x: number; y: number; surge: boolean
@@ -42,24 +44,24 @@ function rng(seed: number) {
 export const travel = (x: number, y: number, h: Hospital) => (Math.hypot(h.x - x, h.y - y) * ROAD) / SPEED
 
 // The same calls for both policies: a normal afternoon + one mass-casualty event.
-function makeIncidents(seed = 7) {
+function makeIncidents(seed = 7, crash: Crash | null = CRASH, rate = 2.4) {
   const r = rng(seed)
   const exp = (mean: number) => -Math.log(1 - r()) * mean
   const calls: { t0: number; x: number; y: number; surge: boolean; dur: number }[] = []
-  for (let t = exp(2.4); t < MINUTES - 60; t += exp(2.4)) {
+  for (let t = exp(rate); t < MINUTES - 60; t += exp(rate)) {
     // more calls near the dense centre
     const cx = r() < 0.5 ? 10 + (r() - 0.5) * 8 : 1 + r() * 18
     const cy = r() < 0.5 ? 7 + (r() - 0.5) * 6 : 1 + r() * 12
     calls.push({ t0: t, x: cx, y: cy, surge: false, dur: 10 + r() * 30 })
   }
-  for (let k = 0; k < CRASH.n; k++) {
-    calls.push({ t0: CRASH.t + r() * 12, x: CRASH.x + (r() - 0.5) * 0.6, y: CRASH.y + (r() - 0.5) * 0.6, surge: true, dur: 15 + r() * 30 })
+  for (let k = 0; crash && k < crash.n; k++) {
+    calls.push({ t0: crash.t + r() * 12, x: crash.x + (r() - 0.5) * 0.6, y: crash.y + (r() - 0.5) * 0.6, surge: true, dur: 15 + r() * 30 })
   }
   return calls.sort((a, b) => a.t0 - b.t0)
 }
 
-export function simulate(policy: Policy, seed = 7): Patient[] {
-  const calls = makeIncidents(seed)
+export function simulate(policy: Policy, seed = 7, crash: Crash | null = CRASH, rate = 2.4): Patient[] {
+  const calls = makeIncidents(seed, crash, rate)
   // What the dispatcher believes: when each doctor will be free, using AVERAGE treatment time only.
   const est: Record<string, number[]> = Object.fromEntries(HOSPITALS.map((h) => [h.id, Array(h.doctors).fill(0)]))
 
@@ -104,7 +106,8 @@ export function snapshot(ps: Patient[], t: number) {
     // must pass through `doctors` doctors, each taking ~TREAT_MEAN minutes.
     const backlog = Math.max(0, waiting + inbound + busy - h.doctors)
     const forecastWait = (backlog * TREAT_MEAN) / h.doctors
-    return { ...h, waiting, busy, inbound, forecastWait }
+    const arrived30 = mine.filter((p) => p.arrive > t - 30 && p.arrive <= t).length
+    return { ...h, waiting, busy, inbound, forecastWait, arrived30 }
   })
   const ambulances = ps.filter((p) => p.t0 <= t && p.arrive > t).map((p) => {
     const h = HOSPITALS.find((x) => x.id === p.hospital)!
@@ -116,7 +119,8 @@ export function snapshot(ps: Patient[], t: number) {
   const lateSoFar = done.filter((p) => p.late).length + ps.filter((p) => p.start > t && t - p.t0 > GOLDEN).length
   // In danger right now: called 30+ minutes ago and still no doctor.
   const atRisk = ps.filter((p) => p.t0 <= t && p.start > t && t - p.t0 >= GOLDEN / 2).length
-  return { hospitals, ambulances, treated: done.length, lateSoFar, atRisk, calls: ps.filter((p) => p.t0 <= t).length }
+  const calls15 = ps.filter((p) => p.t0 > t - 15 && p.t0 <= t).length
+  return { hospitals, ambulances, treated: done.length, lateSoFar, atRisk, calls15, calls: ps.filter((p) => p.t0 <= t).length }
 }
 
 export function summary(ps: Patient[]) {
