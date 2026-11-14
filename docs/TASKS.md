@@ -11,5 +11,6 @@
 | F2 | Panel "Allocation": bar chart avg/max wait FCFS vs QueuePilot + utilisation | WIN | Todo |
 | F3 | Panel "Forecast": line chart actual vs physics vs data vs hybrid, plus error numbers | WIN | Todo |
 | F4 | Panel "Staffing plan": servers per 30-min block from /forecast | WIN | Todo |
+| E6 | Priority users (priority_share), served first by QueuePilot | MAIN | Done |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |

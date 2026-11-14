@@ -47,7 +47,8 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
 
 ## JSON contract (do not change field names without updating this file)
-POST /simulate  body: {"n_people": 150, "runs": 100, "closures": {"C2": [[60, 150]]}}   # closures optional
+POST /simulate  body: {"n_people": 150, "runs": 100, "closures": {"C2": [[60, 150]]}, "priority_share": 0.1}   # closures, priority_share optional
+With priority_share > 0 each side also returns "avg_wait_priority" and "avg_wait_normal".
 Response:
 {"fcfs": {"avg_wait": 12.9, "max_wait": 123, "utilisation": {"C1": 94, "C2": 93, "C3": 47, "C4": 10}},
  "queuepilot": {"avg_wait": 10.7, "max_wait": 113, "utilisation": {"C1": 87, "C2": 91, "C3": 55, "C4": 17}}}
@@ -70,6 +71,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 17:20 [MAIN] — Priority users: /simulate priority_share. 10% priority, 100 runs: priority wait 17.9 → 3.2 min, normal people unchanged (16.4).
 - 14 Nov 17:05 [MAIN] — E4 done: /forecast adds staffing_comparison. Same staff-hours, forecast-planned vs even: peak queue −27%, avg −15%.
 - 14 Nov 16:55 [MAIN] — E5 done: /simulate accepts `closures`. 100-run avg wait: normal FCFS 16.5 vs QP 15.0; C2 closed 60–150 min: FCFS 23.5 vs QP 21.6.
 - 14 Nov 16:45 [MAIN] — Added physics-guided hybrid forecaster + /forecast, BRIDGE.md and TASKS.md. WIN: start F1–F4.
