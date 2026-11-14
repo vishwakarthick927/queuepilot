@@ -1,6 +1,7 @@
 # QueuePilot — shared context for every Claude session
 
 READ THIS FIRST. This file is the single source of truth shared between two machines.
+To explain the research paper (plain words, section by section, how we use it, real-data proof): docs/PAPER.md.
 Then read docs/BRIDGE.md (protocol + MESSAGES between machines) and docs/TASKS.md (who is doing what).
 Before starting any task: `git pull`. After finishing any working feature: update the STATUS section below, commit, `git pull --rebase`, `git push`.
 
@@ -59,7 +60,9 @@ GET /sectors?runs=40&temp=30 → {sugarcane|asphalt|milk|concrete: {"sector","un
 Dataset: Technion SEE "Anonymous Bank" call centre (real arrivals, queue, service, HANG = abandonment). Physics = conservation of callers; learned residual = hang-ups, clipped [−q, 0]; vs pure data (ridge) and naive persistence.
 Tests (busy periods, q ≥ 3, 60-min horizon, train early days → test later days): queue MAE; hang-ups in next hour; learned hang-up rate vs rate measured from logs (interpretability).
 Self-test on synthetic data in the same format (python -m engine.realdata --selftest): hang-up error hybrid 9.4 vs naive 12.3 vs physics 17.8; learned rate 0.055–0.068 vs true 0.077. Queue MAE: data 2.7, hybrid 3.7, naive 4.6, physics 11.3 (pure data wins on queue length here; be honest).
-REAL RESULTS: pending download (WIN task D1).
+REAL RESULTS (data/anonymous_bank_results.json, 183 train → 123 test days, 3,906 busy starts):
+- HEADLINE: learned hang-up rate 0.143–0.153/min vs 0.156/min measured from logs (residual recovered real patience).
+- Queue MAE 60 min: physics 6.19, hybrid 3.09, naive 3.17, data 2.73. Hang-ups next hour abs err: physics 27.1, hybrid 21.6, naive 14.0. Pure data/naive win those metrics; say so.
 
 ## Repo layout & ownership
 | Path | Owner | Notes |
@@ -103,6 +106,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 22:50 [MAIN] — Synced: docs/PAPER.md (paper summary + mapping incl. Golden Hour and Flood + real bank results). realdata glob restricted to *.txt/*.csv/*.tsv (WIN request). Current hero per user: Flood disaster twin (WIN); Golden Hour + sectors = proof of generality.
 - 14 Nov 21:50 [MAIN] — E15: real-data validation pipeline engine/realdata.py for Anonymous Bank (needs download, MAIN sandbox has no internet). Self-test passes.
 - 14 Nov 21:20 [MAIN] — E14: multi-sector perishable engine (sugarcane, asphalt, milk, concrete), GET /sectors, docs/SECTORS.md with business case. Main pitch not chosen yet; all sectors are backups/proof of generality. 12 tests pass.
 - 14 Nov 20:40 [MAIN] — E13: EV charging hub use case (battery-physics queue), engine/ev.py, GET /ev, docs/USE_CASE_EV.md. Wait −75%. 11 tests pass.

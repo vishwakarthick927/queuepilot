@@ -52,7 +52,8 @@ def _sec(hms):
 def load_calls(folder="data/anonymous_bank"):
     """Parse every file in the folder into a list of dicts (one per call)."""
     calls = []
-    for path in sorted(glob.glob(os.path.join(folder, "*"))):
+    paths = [p for ext in ("*.txt", "*.csv", "*.tsv") for p in glob.glob(os.path.join(folder, ext))]
+    for path in sorted(paths):
         if os.path.isdir(path):
             continue
         with open(path, errors="ignore") as f:

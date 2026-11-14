@@ -27,9 +27,10 @@
 | E14 | Multi-sector perishable engine + /sectors + docs/SECTORS.md | MAIN | Done |
 | F9 | Sectors panel: card per sector (physics law, ₹ lost FCFS vs QP, rejected loads), temperature slider, one 'All sectors' summary | WIN | Todo |
 | E15 | Real-data validation pipeline (Anonymous Bank), self-test | MAIN | Done |
-| D1 | DOWNLOAD Anonymous Bank → data/anonymous_bank/, run python -m engine.realdata, commit output as data/anonymous_bank_results.json | WIN | Todo, URGENT |
+| D1 | DOWNLOAD Anonymous Bank → data/anonymous_bank/, run python -m engine.realdata, commit output as data/anonymous_bank_results.json | WIN | Done |
 | D2 | DOWNLOAD Open-Meteo hourly Bengaluru temps → data/weather/bengaluru_hourly.csv | WIN | Todo |
 | D3 | Find + download a public EV charging sessions dataset → data/ev_sessions/ (note source + licence) | WIN | Todo |
 | W-FLOOD | Flood disaster twin: physics-guided CNN flood forecast + evacuation + shelter queues (research/flood/, frontend/src/flood/) | WIN | In progress |
+| E16 | docs/PAPER.md: paper explained + how we use it + real results | MAIN | Done |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |
