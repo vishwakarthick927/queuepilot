@@ -24,3 +24,31 @@ def simulate(req: SimRequest):
             "utilisation": util,
         }
     return out
+
+
+# ---------- physics-guided forecasting (engine/physics.py) ----------
+import numpy as np
+from engine import physics as ph
+
+_steady = np.full(480, 6)
+_train = [(ph.arrival_profile(), _steady, ph.real_world_day(_steady, seed=s)[1]) for s in (1, 2)]
+_model = ph.fit(_train)
+
+
+@app.get("/forecast")
+def forecast():
+    shifted = np.where(np.arange(480) < 240, 4, 7)
+    test = [(ph.arrival_profile(), shifted, ph.real_world_day(shifted, seed=s)[1]) for s in (10, 11, 12)]
+    lam, s, q = test[0]
+    start, h = 60, 60
+    return {
+        "forecast_error": ph.evaluate(_model, test),
+        "example": {
+            "minutes": list(range(start + 1, start + 1 + h)),
+            "actual": [round(float(x), 1) for x in q[start + 1:start + 1 + h]],
+            "physics": [round(float(x), 1) for x in ph.rollout("physics", q[start], lam[start:], s[start:], _model, h)],
+            "data": [round(float(x), 1) for x in ph.rollout("data", q[start], lam[start:], s[start:], _model, h)],
+            "hybrid": [round(float(x), 1) for x in ph.rollout("hybrid", q[start], lam[start:], s[start:], _model, h)],
+        },
+        "staffing_plan": ph.recommend_staffing(_model),
+    }

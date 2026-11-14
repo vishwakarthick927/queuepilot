@@ -1,6 +1,7 @@
 # QueuePilot — shared context for every Claude session
 
 READ THIS FIRST. This file is the single source of truth shared between two machines.
+Then read docs/BRIDGE.md (protocol + MESSAGES between machines) and docs/TASKS.md (who is doing what).
 Before starting any task: `git pull`. After finishing any working feature: update the STATUS section below, commit, `git pull --rebase`, `git push`.
 
 ## Event
@@ -10,7 +11,21 @@ Rule: all work must be the team's original work — members must understand and 
 Judged on: technical implementation, feasibility, creativity, efficiency & optimization, problem-solving, presentation.
 
 ## The idea (one sentence)
-We send each person to the counter where they'll be served fastest, not the one that looks shortest, and prove it with a simulation.
+QueuePilot is a physics-guided brain for any service system: it forecasts how queues will grow, decides how many servers to open, and sends each arrival to the server where they'll be served fastest.
+
+General, not niche: works for admin counters, hospital OPDs, bank branches, EV chargers, call centres, even cloud servers. Anything with arrivals, servers and waiting.
+
+## Research basis
+Yu & Wang, "Learning dynamical systems from data: An introduction to physics-guided deep learning", PNAS 2024 (doi:10.1073/pnas.2311808121).
+Their point: physics-only models are rigid; pure deep learning needs lots of data and breaks physical laws. Hybrid = physics structure + learned residual.
+Our use (engine/physics.py):
+- Physics: conservation law of the queue, dq/dt = arrivals − μ·servers, q ≥ 0 (fluid queue ODE).
+- Learned residual: what physics misses (people abandoning long lines). Ridge regression now; swappable for a small neural net.
+- Physics constraint on the learned part: the residual can never remove more people than are waiting.
+- Tested under distribution shift (staffing never seen in training): 60-min forecast error, physics 4.3, pure data 10.6, hybrid 3.0 people.
+- Decision layer: staffing plan per 30-min block via Little's law (W = queue / throughput) to keep wait ≤ 10 min.
+
+Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (allocation).
 
 ## How it works
 - Services have average durations (id_card ~1 min, fee_query ~6, certificate ~20); actual time varies ±50%.
@@ -27,6 +42,7 @@ We send each person to the counter where they'll be served fastest, not the one 
 | api/ | Main machine | FastAPI. `uvicorn api.main:app --reload` from repo root |
 | frontend/ | Windows machine (teammate) | React dashboard |
 | docs/CONSTRAINTS.md | Teammate 3 / anyone | Log every constraint verbatim |
+| docs/BRIDGE.md, docs/TASKS.md | Shared | Append only; protocol in BRIDGE.md |
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
 
 ## JSON contract (do not change field names without updating this file)
@@ -35,6 +51,10 @@ Response:
 {"fcfs": {"avg_wait": 12.9, "max_wait": 123, "utilisation": {"C1": 94, "C2": 93, "C3": 47, "C4": 10}},
  "queuepilot": {"avg_wait": 10.7, "max_wait": 113, "utilisation": {"C1": 87, "C2": 91, "C3": 55, "C4": 17}}}
 Times in minutes, utilisation in %.
+
+GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 3.01},
+ "example": {"minutes": [...60], "actual": [...], "physics": [...], "data": [...], "hybrid": [...]},
+ "staffing_plan": [2,3,4,5,3,2,1,2,2,3,3,4,3,2,1,1]}   # servers per 30-min block, 8-hour day
 
 ## Constraint cheat sheet
 - New service/counter → SERVICES / COUNTERS in engine/simulation.py
@@ -47,6 +67,7 @@ Times in minutes, utilisation in %.
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 16:45 [MAIN] — Added physics-guided hybrid forecaster + /forecast, BRIDGE.md and TASKS.md. WIN: start F1–F4.
 - 14 Nov 13:15 — Repo created: engine simulation + /simulate API scaffold. Frontend not started.
 
 ## REQUESTS (cross-machine asks)
