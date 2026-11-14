@@ -30,5 +30,6 @@
 | D1 | DOWNLOAD Anonymous Bank → data/anonymous_bank/, run python -m engine.realdata, commit output as data/anonymous_bank_results.json | WIN | Todo, URGENT |
 | D2 | DOWNLOAD Open-Meteo hourly Bengaluru temps → data/weather/bengaluru_hourly.csv | WIN | Todo |
 | D3 | Find + download a public EV charging sessions dataset → data/ev_sessions/ (note source + licence) | WIN | Todo |
+| W-FLOOD | Flood disaster twin: physics-guided CNN flood forecast + evacuation + shelter queues (research/flood/, frontend/src/flood/) | WIN | In progress |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |
