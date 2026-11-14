@@ -11,13 +11,15 @@ class SimRequest(BaseModel):
     n_people: int = 150
     runs: int = 100          # average over this many random crowds
     closures: dict = {}      # e.g. {"C2": [[60, 150]]} -> C2 closed minutes 60-150
+    priority_share: float = 0.0  # e.g. 0.1 -> 10% priority people; QueuePilot serves them first
 
 @app.post("/simulate")
 def simulate(req: SimRequest):
     out = {}
     for key, strat in [("fcfs", sim.pick_shortest_line), ("queuepilot", sim.pick_queuepilot)]:
-        results = [sim.simulate(sim.make_people(req.n_people, seed=s), strat,
-                                {k: [tuple(w) for w in v] for k, v in req.closures.items()}) for s in range(req.runs)]
+        results = [sim.simulate(sim.make_people(req.n_people, seed=s, priority_share=req.priority_share), strat,
+                                {k: [tuple(w) for w in v] for k, v in req.closures.items()},
+                                use_priority=(key == "queuepilot")) for s in range(req.runs)]
         util = {c: round(sum(r["utilisation"][c] for r in results) / req.runs)
                 for c in results[0]["utilisation"]}
         out[key] = {
@@ -25,6 +27,9 @@ def simulate(req: SimRequest):
             "max_wait": round(sum(r["max_wait"] for r in results) / req.runs, 1),
             "utilisation": util,
         }
+        for extra in ("avg_wait_priority", "avg_wait_normal"):
+            if extra in results[0]:
+                out[key][extra] = round(sum(r[extra] for r in results) / req.runs, 1)
     return out
 
 
@@ -53,4 +58,5 @@ def forecast():
             "hybrid": [round(float(x), 1) for x in ph.rollout("hybrid", q[start], lam[start:], s[start:], _model, h)],
         },
         "staffing_plan": ph.recommend_staffing(_model),
+        "staffing_comparison": ph.compare_staffing(_model),
     }

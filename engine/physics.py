@@ -98,7 +98,7 @@ def evaluate(model, test_days, horizon=60):
 
 
 # ---------- decision layer: physics-guided staffing ----------
-def recommend_staffing(model, q0=0.0, target_wait=10, max_servers=8, block=30, minutes=480):
+def recommend_staffing(model, q0=0.0, target_wait=5, max_servers=8, block=30, minutes=480):
     """For each 30-min block, the fewest servers keeping forecast wait under target.
     Wait estimated with Little's law: W = queue / service throughput."""
     lam, plan, q = arrival_profile(minutes), [], q0
@@ -123,3 +123,21 @@ if __name__ == "__main__":
     model = fit(train)
     print("60-min forecast error, people (lower is better):", evaluate(model, test))
     print("Recommended servers per 30-min block:", recommend_staffing(model))
+
+
+def compare_staffing(model, seeds=range(20, 40)):
+    """Same total staff-hours, two ways to spend them:
+    fixed = same number of servers all day; planned = hybrid-forecast staffing plan.
+    Returns average waiting people and average wait (Little's law) for each."""
+    plan = np.repeat(recommend_staffing(model), 30)
+    fixed = np.full(480, plan.mean())  # exactly the same staff-minutes, spread evenly
+    fixed_minutes, plan_minutes = fixed.sum(), plan.sum()
+    out = {}
+    for name, servers in [("fixed", fixed), ("planned", plan)]:
+        days = [real_world_day(servers, seed=s)[1] for s in seeds]
+        q = np.mean([d.mean() for d in days])
+        lam = arrival_profile().mean()
+        out[name] = {"avg_queue": round(float(q), 1), "peak_queue": round(float(np.mean([d.max() for d in days])), 1),
+                     "avg_wait_min": round(float(q / lam), 1),
+                     "staff_minutes": int(round(servers.sum()))}
+    return out

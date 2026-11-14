@@ -27,15 +27,18 @@ COUNTERS = [
 
 
 # ---------- 2. GENERATE FAKE PEOPLE ----------
-def make_people(n=150, avg_gap=1.6, seed=42):
-    """Random arrivals. avg_gap = average minutes between two people arriving."""
+def make_people(n=150, avg_gap=1.6, seed=42, priority_share=0.0):
+    """Random arrivals. avg_gap = average minutes between two people arriving.
+    priority_share = fraction of people who are priority (elderly, emergency)."""
+    prio_rng = random.Random(seed + 10_000)  # separate stream: same crowd with or without priority
     rng = random.Random(seed)
     people, t = [], 0.0
     for i in range(n):
         t += rng.expovariate(1 / avg_gap)          # random gap between arrivals
         service = rng.choices(list(SERVICES), weights=[5, 3, 2])[0]
         duration = rng.uniform(0.5, 1.5) * SERVICES[service]   # actual time varies
-        people.append({"id": i, "arrive": t, "service": service, "duration": duration})
+        people.append({"id": i, "arrive": t, "service": service, "duration": duration,
+                       "priority": prio_rng.random() < priority_share})
     return people
 
 
@@ -67,37 +70,56 @@ def _skip_closed(t, name, closures):
     return t
 
 
-def simulate(people, strategy, closures=None):
+def _schedule_from(c, i, closures):
+    """Re-time jobs i.. of a counter back-to-back after a priority insertion."""
+    prev_end = c["jobs"][i - 1]["end"] if i > 0 else 0.0
+    for j in c["jobs"][i:]:
+        j["start"] = _skip_closed(max(j["p"]["arrive"], prev_end), c["name"], closures)
+        j["end"] = prev_end = j["start"] + j["p"]["duration"]
+
+
+def simulate(people, strategy, closures=None, use_priority=False):
     """closures: {"C2": [(60, 120)]} -> C2 is closed from minute 60 to 120.
     People already in its line must wait; QueuePilot knows and routes around it,
-    people choosing by line length do not."""
+    people choosing by line length do not.
+    use_priority: priority people go to the front of their counter's line
+    (after the person currently being served)."""
     closures = closures or {}
-    counters = [{**c, "free_at": 0.0, "free_at_est": 0.0, "ends": [], "busy": 0.0}
-                for c in COUNTERS]
-    waits = []
+    counters = [{**c, "free_at_est": 0.0, "jobs": [], "busy": 0.0} for c in COUNTERS]
     for p in people:
         capable = [c for c in counters if p["service"] in c["can_do"]]
-        for x in capable:  # QueuePilot's estimate includes known closures
+        for x in capable:  # estimates include known closures
             x["free_at_est"] = _skip_closed(max(p["arrive"], x["free_at_est"]), x["name"], closures)
+            x["ends"] = [j["end"] for j in x["jobs"]]  # for line-length counting
         c = strategy(capable, p)
 
-        start = max(p["arrive"], c["free_at"])   # wait until counter is free
-        start = _skip_closed(start, c["name"], closures)
-        end = start + p["duration"]
-        waits.append(start - p["arrive"])
+        jobs = c["jobs"]
+        if use_priority and p.get("priority"):
+            # front of the line: before everyone who hasn't started yet
+            i = next((k for k, j in enumerate(jobs) if j["start"] > p["arrive"]), len(jobs))
+        else:
+            i = len(jobs)
+        jobs.insert(i, {"p": p, "start": 0.0, "end": 0.0})
+        _schedule_from(c, i, closures)
 
-        c["free_at"] = end
         # system only KNOWS the average time, not the real one
         c["free_at_est"] = c["free_at_est"] + SERVICES[p["service"]]
-        c["ends"].append(end)
         c["busy"] += p["duration"]
 
-    total_time = max(c["free_at"] for c in counters)
-    return {
+    all_jobs = [j for c in counters for j in c["jobs"]]
+    waits = [j["start"] - j["p"]["arrive"] for j in all_jobs]
+    prio = [w for w, j in zip(waits, all_jobs) if j["p"].get("priority")]
+    norm = [w for w, j in zip(waits, all_jobs) if not j["p"].get("priority")]
+    total_time = max(j["end"] for j in all_jobs)
+    out = {
         "avg_wait": sum(waits) / len(waits),
         "max_wait": max(waits),
         "utilisation": {c["name"]: round(100 * c["busy"] / total_time) for c in counters},
     }
+    if prio:
+        out["avg_wait_priority"] = sum(prio) / len(prio)
+        out["avg_wait_normal"] = sum(norm) / len(norm)
+    return out
 
 
 # ---------- 5. COMPARE ----------

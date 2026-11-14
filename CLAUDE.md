@@ -23,7 +23,8 @@ Our use (engine/physics.py):
 - Learned residual: what physics misses (people abandoning long lines). Ridge regression now; swappable for a small neural net.
 - Physics constraint on the learned part: the residual can never remove more people than are waiting.
 - Tested under distribution shift (staffing never seen in training): 60-min forecast error, physics 4.3, pure data 10.6, hybrid 3.0 people.
-- Decision layer: staffing plan per 30-min block via Little's law (W = queue / throughput) to keep wait ≤ 10 min.
+- Decision layer: staffing plan per 30-min block via Little's law (W = queue / throughput) to keep wait ≤ 5 min.
+- Same staff-hours, spent by the forecast instead of evenly: avg queue 6.2 → 5.3 (−15%), peak queue 25 → 18 (−27%).
 
 Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (allocation).
 
@@ -46,7 +47,8 @@ Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (alloca
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
 
 ## JSON contract (do not change field names without updating this file)
-POST /simulate  body: {"n_people": 150, "runs": 100, "closures": {"C2": [[60, 150]]}}   # closures optional
+POST /simulate  body: {"n_people": 150, "runs": 100, "closures": {"C2": [[60, 150]]}, "priority_share": 0.1}   # closures, priority_share optional
+With priority_share > 0 each side also returns "avg_wait_priority" and "avg_wait_normal".
 Response:
 {"fcfs": {"avg_wait": 12.9, "max_wait": 123, "utilisation": {"C1": 94, "C2": 93, "C3": 47, "C4": 10}},
  "queuepilot": {"avg_wait": 10.7, "max_wait": 113, "utilisation": {"C1": 87, "C2": 91, "C3": 55, "C4": 17}}}
@@ -54,7 +56,9 @@ Times in minutes, utilisation in %.
 
 GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 3.01},
  "example": {"minutes": [...60], "actual": [...], "physics": [...], "data": [...], "hybrid": [...]},
- "staffing_plan": [2,3,4,5,3,2,1,2,2,3,3,4,3,2,1,1]}   # servers per 30-min block, 8-hour day
+ "staffing_plan": [2,4,7,7,4,2,2,2,3,4,5,5,4,3,2,2],   # servers per 30-min block, 8-hour day
+ "staffing_comparison": {"fixed": {"avg_queue": 6.2, "peak_queue": 25.0, "avg_wait_min": 6.3, "staff_minutes": 1740},
+                         "planned": {"avg_queue": 5.3, "peak_queue": 18.3, "avg_wait_min": 5.4, "staff_minutes": 1740}}}
 
 ## Constraint cheat sheet
 - New service/counter → SERVICES / COUNTERS in engine/simulation.py
@@ -68,6 +72,9 @@ For each constraint: what changed? which part? simplest fix? how do we show it w
 
 ## STATUS (update this — newest first, one line each)
 - 14 Nov 17:30 [WIN] — F1–F4 done: frontend/ React+Vite+TS+Tailwind dashboard (Forecast, Plan, Route with live closure toggles + sliders). Run: cd frontend && npm i && npm run dev. Falls back to saved real API responses if backend is down.
+- 14 Nov 17:30 [MAIN] — Added tests: `python -m tests.test_engine` (5 checks, all pass). Run after every constraint change.
+- 14 Nov 17:20 [MAIN] — Priority users: /simulate priority_share. 10% priority, 100 runs: priority wait 17.9 → 3.2 min, normal people unchanged (16.4).
+- 14 Nov 17:05 [MAIN] — E4 done: /forecast adds staffing_comparison. Same staff-hours, forecast-planned vs even: peak queue −27%, avg −15%.
 - 14 Nov 16:55 [MAIN] — E5 done: /simulate accepts `closures`. 100-run avg wait: normal FCFS 16.5 vs QP 15.0; C2 closed 60–150 min: FCFS 23.5 vs QP 21.6.
 - 14 Nov 16:45 [MAIN] — Added physics-guided hybrid forecaster + /forecast, BRIDGE.md and TASKS.md. WIN: start F1–F4.
 - 14 Nov 13:15 — Repo created: engine simulation + /simulate API scaffold. Frontend not started.
