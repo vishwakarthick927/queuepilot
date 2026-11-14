@@ -55,6 +55,12 @@ Policy: serve max (₹ lost if it waits one more slot) / service minutes = cμ r
 GET /sectors?runs=40&temp=30 → {sugarcane|asphalt|milk|concrete: {"sector","unit","physics","money","servers","temp_c",
  "fcfs": {"jobs","value_rs","lost_rs","rejected","avg_wait"}, "queuepilot": {...}, "loss_cut_pct","saved_rs_per_day","win_rate"}}
 
+## Real-data validation of the paper's method (engine/realdata.py, data/README.md)
+Dataset: Technion SEE "Anonymous Bank" call centre (real arrivals, queue, service, HANG = abandonment). Physics = conservation of callers; learned residual = hang-ups, clipped [−q, 0]; vs pure data (ridge) and naive persistence.
+Tests (busy periods, q ≥ 3, 60-min horizon, train early days → test later days): queue MAE; hang-ups in next hour; learned hang-up rate vs rate measured from logs (interpretability).
+Self-test on synthetic data in the same format (python -m engine.realdata --selftest): hang-up error hybrid 9.4 vs naive 12.3 vs physics 17.8; learned rate 0.055–0.068 vs true 0.077. Queue MAE: data 2.7, hybrid 3.7, naive 4.6, physics 11.3 (pure data wins on queue length here; be honest).
+REAL RESULTS: pending download (WIN task D1).
+
 ## Repo layout & ownership
 | Path | Owner | Notes |
 |---|---|---|
@@ -62,6 +68,7 @@ GET /sectors?runs=40&temp=30 → {sugarcane|asphalt|milk|concrete: {"sector","un
 | api/ | Main machine | FastAPI. `uvicorn api.main:app --reload` from repo root |
 | frontend/ | Windows machine (teammate) | React dashboard |
 | docs/CONSTRAINTS.md | Teammate 3 / anyone | Log every constraint verbatim |
+| data/ | WIN downloads, MAIN analyses | Real datasets, see data/README.md |
 | research/ | Windows machine | Standalone PyTorch research MVP (R1). Imports nothing from engine/. |
 | docs/BRIDGE.md, docs/TASKS.md | Shared | Append only; protocol in BRIDGE.md |
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
@@ -96,6 +103,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 21:50 [MAIN] — E15: real-data validation pipeline engine/realdata.py for Anonymous Bank (needs download, MAIN sandbox has no internet). Self-test passes.
 - 14 Nov 21:20 [MAIN] — E14: multi-sector perishable engine (sugarcane, asphalt, milk, concrete), GET /sectors, docs/SECTORS.md with business case. Main pitch not chosen yet; all sectors are backups/proof of generality. 12 tests pass.
 - 14 Nov 20:40 [MAIN] — E13: EV charging hub use case (battery-physics queue), engine/ev.py, GET /ev, docs/USE_CASE_EV.md. Wait −75%. 11 tests pass.
 - 14 Nov 20:15 [MAIN] — E11+E12 (REVIEW #1,#2,#4,#5): constrained residual, hybrid 1.8 vs physics 4.3; stable "normal" preset default; pooled 7.1→5.0 min (−30%, wins 100% of crowds); CI, win rate, per-service waits in /simulate. 9 tests pass.
