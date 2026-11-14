@@ -59,21 +59,36 @@ def pick_queuepilot(capable, person):
 
 
 # ---------- 4. RUN ONE SIMULATION ----------
-def simulate(people, strategy):
+def _skip_closed(t, name, closures):
+    """If time t falls inside a closure window of this counter, jump to its reopening."""
+    for a, b in closures.get(name, []):
+        if a <= t < b:
+            return b
+    return t
+
+
+def simulate(people, strategy, closures=None):
+    """closures: {"C2": [(60, 120)]} -> C2 is closed from minute 60 to 120.
+    People already in its line must wait; QueuePilot knows and routes around it,
+    people choosing by line length do not."""
+    closures = closures or {}
     counters = [{**c, "free_at": 0.0, "free_at_est": 0.0, "ends": [], "busy": 0.0}
                 for c in COUNTERS]
     waits = []
     for p in people:
         capable = [c for c in counters if p["service"] in c["can_do"]]
+        for x in capable:  # QueuePilot's estimate includes known closures
+            x["free_at_est"] = _skip_closed(max(p["arrive"], x["free_at_est"]), x["name"], closures)
         c = strategy(capable, p)
 
         start = max(p["arrive"], c["free_at"])   # wait until counter is free
+        start = _skip_closed(start, c["name"], closures)
         end = start + p["duration"]
         waits.append(start - p["arrive"])
 
         c["free_at"] = end
         # system only KNOWS the average time, not the real one
-        c["free_at_est"] = max(p["arrive"], c["free_at_est"]) + SERVICES[p["service"]]
+        c["free_at_est"] = c["free_at_est"] + SERVICES[p["service"]]
         c["ends"].append(end)
         c["busy"] += p["duration"]
 

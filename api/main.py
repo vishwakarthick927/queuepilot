@@ -10,12 +10,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 class SimRequest(BaseModel):
     n_people: int = 150
     runs: int = 100          # average over this many random crowds
+    closures: dict = {}      # e.g. {"C2": [[60, 150]]} -> C2 closed minutes 60-150
 
 @app.post("/simulate")
 def simulate(req: SimRequest):
     out = {}
     for key, strat in [("fcfs", sim.pick_shortest_line), ("queuepilot", sim.pick_queuepilot)]:
-        results = [sim.simulate(sim.make_people(req.n_people, seed=s), strat) for s in range(req.runs)]
+        results = [sim.simulate(sim.make_people(req.n_people, seed=s), strat,
+                                {k: [tuple(w) for w in v] for k, v in req.closures.items()}) for s in range(req.runs)]
         util = {c: round(sum(r["utilisation"][c] for r in results) / req.runs)
                 for c in results[0]["utilisation"]}
         out[key] = {
