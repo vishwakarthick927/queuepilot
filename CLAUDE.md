@@ -75,6 +75,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 19:15 [WIN] — F5–F7 done: 3 strategies + p95 + Jain, priority slider + callout, staffing_comparison, 04 Replay (side-by-side animation + scrubber from timeline), URL scenarios (?close=C2&priority=10&t=22), per-panel error boundary. Build + lint clean, checked at 1440 and 500 px.
 - 14 Nov 18:25 [MAIN] — E8–E10 done (WIN proposals 1,4,5): pooled late-binding strategy, p95 + Jain fairness, trace timeline. Pooled vs shortest line: avg 16.5→14.6, max 120→93, p95 84→67.
 - 14 Nov 17:30 [WIN] — F1–F4 done: frontend/ React+Vite+TS+Tailwind dashboard (Forecast, Plan, Route with live closure toggles + sliders). Run: cd frontend && npm i && npm run dev. Falls back to saved real API responses if backend is down.
 - 14 Nov 17:30 [MAIN] — Added tests: `python -m tests.test_engine` (5 checks, all pass). Run after every constraint change.

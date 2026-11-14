@@ -1,32 +1,25 @@
-# React + TypeScript + Vite
+# QueuePilot dashboard (frontend/, owned by WIN)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + Vite + TypeScript + Tailwind v4 + Recharts.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
 ```
+cd frontend && npm install && npm run dev      # http://localhost:5173
+```
+Backend (repo root): `uvicorn api.main:app --reload` on :8000. Override with `VITE_API=http://host:8000`.
+If the API is down, the dashboard shows saved real responses from `src/data/*.json` and says OFFLINE.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Panels
+01 Forecast (`/forecast` example + errors) · 02 Plan (`staffing_plan` + `staffing_comparison`) ·
+03 Route (`/simulate`, 3 strategies, closures, priority) · 04 Replay (`timeline` from `trace: true`).
+
+## Demo links (scenario set from the URL)
+- `/?close=C2&from=60&len=120` C2 closed 60–180 min
+- `/?priority=10` 10% priority people
+- `&t=22` start the replay at frame 22 (= minute 110)
+
+## Files
+`src/api.ts` API types + fetch + offline fallback · `src/scenario.ts` counters, controls, URL parsing ·
+`src/components/*Panel.tsx` one file per panel · `Frame.tsx` panel chrome · `Guard.tsx` per-panel error boundary.
+
+Refresh offline data after engine changes: `curl -s localhost:8000/forecast > src/data/forecast.json` and
+`curl -s -X POST localhost:8000/simulate -H 'content-type: application/json' -d '{"runs":60,"trace":true}' > src/data/simulate.json`.

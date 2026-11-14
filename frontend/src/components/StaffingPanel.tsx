@@ -1,7 +1,7 @@
+import { gain, type ForecastResponse } from '../api'
 import { Frame, Label } from './Frame'
 
 const DAY_START = 9 // display only: the engine's 8-hour day is minutes 0–480; we label it 09:00–17:00
-const FIXED = 6     // the steady staffing used in training: 6 counters open all day
 
 const clock = (block: number) => {
   const mins = DAY_START * 60 + block * 30
@@ -9,14 +9,18 @@ const clock = (block: number) => {
 }
 
 // One column per 30-minute block; each lit cell is one open counter.
-export function StaffingPlan({ plan }: { plan: number[] }) {
-  const max = Math.max(FIXED, ...plan)
-  const planHours = plan.reduce((a, b) => a + b, 0) / 2
-  const fixedHours = FIXED * plan.length / 2
+export function StaffingPlan({ plan, compare }: { plan: number[]; compare: ForecastResponse['staffing_comparison'] }) {
+  const max = Math.max(...plan)
+  const { fixed, planned } = compare
+  const rows = [
+    { label: 'Peak queue', unit: 'people', a: fixed.peak_queue, b: planned.peak_queue },
+    { label: 'Average wait', unit: 'min', a: fixed.avg_wait_min, b: planned.avg_wait_min },
+    { label: 'Average queue', unit: 'people', a: fixed.avg_queue, b: planned.avg_queue },
+  ]
 
   return (
-    <Frame index="02" title="Plan" subtitle="Counters to open per 30 min · keeps wait ≤ 10 min (Little's law)">
-      <div className="grid gap-6 lg:grid-cols-[1fr_240px]">
+    <Frame index="02" title="Plan" subtitle="Counters to open per 30 min, from the forecast (Little's law: wait = queue ÷ throughput)">
+      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="overflow-x-auto">
           <div className="flex min-w-[520px] items-end gap-1.5">
             {plan.map((n, i) => (
@@ -32,18 +36,25 @@ export function StaffingPlan({ plan }: { plan: number[] }) {
             ))}
           </div>
         </div>
-        <div className="space-y-4">
-          <div>
-            <Label>Counter-hours needed</Label>
-            <div className="num mt-1 text-3xl text-qp">{planHours}<span className="ml-2 text-sm text-faint">h</span></div>
+
+        <div>
+          <Label>Same {planned.staff_minutes.toLocaleString()} staff-minutes · spread evenly vs planned</Label>
+          <div className="mt-3 space-y-3">
+            {rows.map((r) => (
+              <div key={r.label} className="flex items-baseline justify-between border-b border-line pb-2">
+                <span className="text-sm text-dim">{r.label}</span>
+                <span className="num text-sm">
+                  <span className="text-base">{r.a}</span>
+                  <span className="mx-1.5 text-faint">→</span>
+                  <span className="text-qp">{r.b}</span>
+                  <span className="ml-1 text-faint">{r.unit}</span>
+                  <span className="ml-2 text-qp">−{gain(r.a, r.b).toFixed(0)}%</span>
+                </span>
+              </div>
+            ))}
           </div>
-          <div>
-            <Label>vs {FIXED} counters all day</Label>
-            <div className="num mt-1 text-xl">{fixedHours}<span className="ml-2 text-sm text-faint">h</span></div>
-          </div>
-          <p className="border-t border-line pt-3 text-xs leading-relaxed text-dim">
-            Staff follows the forecast: more counters in the morning and afternoon rush, fewer in the lull.
-            <span className="num ml-1 text-qp">{Math.round((1 - planHours / fixedHours) * 100)}% fewer counter-hours.</span>
+          <p className="mt-3 text-xs leading-relaxed text-dim">
+            No extra staff. The forecast moves the same people to the rush hours, so the peak queue shrinks.
           </p>
         </div>
       </div>

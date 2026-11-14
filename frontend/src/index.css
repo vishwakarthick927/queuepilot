@@ -16,6 +16,7 @@
 
   --color-qp: #3ddc84;       /* QueuePilot / hybrid: the hero colour */
   --color-base: #f2a541;     /* baseline / physics-only */
+  --color-route: #5aa9ff;    /* QueuePilot route-on-arrival (middle strategy) */
   --color-data: #f06a6a;     /* pure data model */
   --color-alert: #ff5d5d;
 }
@@ -47,3 +48,7 @@ input[type="range"] { accent-color: var(--color-qp); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
 }
+
+/* Grid children default to min-width:auto, so a wide chart or the scrollable staffing grid
+   would stretch the column past the screen on phones. Let them shrink instead. */
+.grid > * { min-width: 0; }

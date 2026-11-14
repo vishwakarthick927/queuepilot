@@ -1,25 +1,44 @@
-import { useCallback, useEffect, useState } from 'react'
-import { forecast, gain, type ForecastResponse, type SimResponse, type Source } from './api'
+import { useEffect, useState } from 'react'
+import { forecast, gain, simulate, type Closures, type ForecastResponse, type SimResponse, type Source } from './api'
 import { AllocationPanel } from './components/AllocationPanel'
+import { controlsFromUrl, type Controls } from './scenario'
+import { ReplayPanel } from './components/ReplayPanel'
 import { ForecastPanel } from './components/ForecastPanel'
 import { StaffingPlan } from './components/StaffingPanel'
 import { Label } from './components/Frame'
+import { Guard } from './components/Guard'
 
 export default function App() {
   const [fc, setFc] = useState<ForecastResponse | null>(null)
   const [sim, setSim] = useState<SimResponse | null>(null)
   const [source, setSource] = useState<Source>('live')
+  const [busy, setBusy] = useState(false)
+  const [controls, setControls] = useState<Controls>(controlsFromUrl)
 
   useEffect(() => { forecast().then((r) => { setFc(r.data); if (r.source === 'offline') setSource('offline') }) }, [])
-  const onSim = useCallback((r: SimResponse, s: Source) => { setSim(r); setSource(s) }, [])
+
+  const update = (c: Controls) => { setBusy(true); setControls(c) }
+
+  // Re-run the simulation whenever the scenario changes (debounced so sliders feel smooth).
+  // `stale` stops an old, slower response from overwriting a newer one.
+  useEffect(() => {
+    const closures: Closures = Object.fromEntries(controls.closed.map((c) => [c, [[controls.from, controls.from + controls.length]]]))
+    let stale = false
+    const timer = setTimeout(async () => {
+      const r = await simulate({ closures, priority_share: controls.priority / 100 })
+      if (stale) return
+      setSim(r.data); setSource(r.source); setBusy(false)
+    }, 350)
+    return () => { stale = true; clearTimeout(timer) }
+  }, [controls])
 
   // Headline numbers for the KPI strip.
   const err = fc?.forecast_error
   const kpis = [
     { label: 'Forecast error vs physics', value: err ? gain(err.physics, err.hybrid) : null, note: 'hybrid model' },
     { label: 'Forecast error vs pure data', value: err ? gain(err.data, err.hybrid) : null, note: 'hybrid model' },
-    { label: 'Average wait', value: sim ? gain(sim.fcfs.avg_wait, sim.queuepilot.avg_wait) : null, note: 'vs shortest line' },
-    { label: 'Worst-case wait', value: sim ? gain(sim.fcfs.max_wait, sim.queuepilot.max_wait) : null, note: 'vs shortest line' },
+    { label: 'Average wait', value: sim ? gain(sim.fcfs.avg_wait, sim.pooled.avg_wait) : null, note: 'pooled queue vs shortest line' },
+    { label: 'Worst-case wait', value: sim ? gain(sim.fcfs.max_wait, sim.pooled.max_wait) : null, note: 'pooled queue vs shortest line' },
   ]
 
   return (
@@ -57,9 +76,10 @@ export default function App() {
 
       {/* ---------- the three layers ---------- */}
       <main className="mt-6 space-y-6">
-        {fc && <ForecastPanel data={fc} />}
-        {fc && <StaffingPlan plan={fc.staffing_plan} />}
-        <AllocationPanel onResult={onSim} />
+        <Guard name="Forecast">{fc && <ForecastPanel data={fc} />}</Guard>
+        <Guard name="Plan">{fc && <StaffingPlan plan={fc.staffing_plan} compare={fc.staffing_comparison} />}</Guard>
+        <Guard name="Route"><AllocationPanel controls={controls} setControls={update} result={sim} source={source} busy={busy} /></Guard>
+        <Guard name="Replay">{sim && <ReplayPanel key={JSON.stringify(controls)} result={sim} controls={controls} />}</Guard>
       </main>
 
       <footer className="num mt-8 flex flex-wrap justify-between gap-2 border-t border-line pt-4 text-[11px] text-faint">
@@ -70,11 +90,11 @@ export default function App() {
   )
 }
 
-// FORECAST → PLAN → ROUTE, the three layers in order.
+// FORECAST → PLAN → ROUTE → REPLAY, the panels in order.
 function Pipeline() {
   return (
     <ol className="num hidden items-center gap-2 text-[11px] tracking-widest text-dim md:flex">
-      {['FORECAST', 'PLAN', 'ROUTE'].map((s, i) => (
+      {['FORECAST', 'PLAN', 'ROUTE', 'REPLAY'].map((s, i) => (
         <li key={s} className="flex items-center gap-2">
           {i > 0 && <span className="text-faint">→</span>}
           <span><span className="text-qp">0{i + 1}</span> {s}</span>

@@ -1,42 +1,25 @@
-import { useEffect, useState } from 'react'
-import { simulate, gain, type Closures, type SimResponse, type Source } from '../api'
+import { gain, STRATEGIES, STRAT_STYLE, type SimResponse, type Source } from '../api'
 import { Frame, Key, Label } from './Frame'
+import { COUNTERS, type Controls } from '../scenario'
 
-// Mirrors COUNTERS in engine/simulation.py (what each counter can do).
-const COUNTERS = [
-  { name: 'C1', skills: 'ID · FEE · CERT' },
-  { name: 'C2', skills: 'ID · FEE · CERT' },
-  { name: 'C3', skills: 'ID · FEE' },
-  { name: 'C4', skills: 'ID' },
-]
-const BASE = 'var(--color-base)'
-const QP = 'var(--color-qp)'
 
-export function AllocationPanel({ onResult }: { onResult: (r: SimResponse, s: Source) => void }) {
-  const [closed, setClosed] = useState<string[]>([])  // counters switched off
-  const [from, setFrom] = useState(60)                 // closure starts (minute)
-  const [length, setLength] = useState(90)             // closure lasts (minutes)
-  const [result, setResult] = useState<SimResponse | null>(null)
-  const [source, setSource] = useState<Source>('live')
-  const [busy, setBusy] = useState(false)
+type Props = {
+  controls: Controls
+  setControls: (c: Controls) => void
+  result: SimResponse | null
+  source: Source
+  busy: boolean
+}
 
-  // Re-run the simulation whenever the scenario changes (debounced so sliders feel smooth).
-  useEffect(() => {
-    const closures: Closures = Object.fromEntries(closed.map((c) => [c, [[from, from + length]]]))
-    setBusy(true)
-    const timer = setTimeout(async () => {
-      const r = await simulate(closures)
-      setResult(r.data); setSource(r.source); setBusy(false); onResult(r.data, r.source)
-    }, 350)
-    return () => clearTimeout(timer)
-  }, [closed, from, length, onResult])
-
-  const toggle = (c: string) => setClosed((cs) => (cs.includes(c) ? cs.filter((x) => x !== c) : [...cs, c]))
+export function AllocationPanel({ controls, setControls, result, source, busy }: Props) {
+  const { closed, from, length, priority } = controls
+  const set = (patch: Partial<Controls>) => setControls({ ...controls, ...patch })
+  const toggle = (c: string) => set({ closed: closed.includes(c) ? closed.filter((x) => x !== c) : [...closed, c] })
 
   return (
     <Frame
-      index="03" title="Route" subtitle="Shortest line vs QueuePilot · 150 arrivals × 60 random days"
-      right={<div className="flex gap-4"><Key color={BASE}>Shortest line</Key><Key color={QP}>QueuePilot</Key></div>}
+      index="03" title="Route" subtitle="Who goes to which counter · 150 arrivals × 60 random days"
+      right={<div className="flex flex-wrap gap-4">{STRATEGIES.map((k) => <Key key={k} color={STRAT_STYLE[k].color}>{STRAT_STYLE[k].short}</Key>)}</div>}
     >
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         {/* --- scenario controls --- */}
@@ -61,9 +44,10 @@ export function AllocationPanel({ onResult }: { onResult: (r: SimResponse, s: So
               })}
             </div>
           </div>
-          <Slider label="Closure starts" unit="min" value={from} min={0} max={200} step={10} onChange={setFrom} disabled={!closed.length} />
-          <Slider label="Closure lasts" unit="min" value={length} min={30} max={180} step={10} onChange={setLength} disabled={!closed.length} />
-          {source === 'offline' && closed.length > 0 && (
+          <Slider label="Closure starts" unit="min" value={from} min={0} max={200} step={10} onChange={(v) => set({ from: v })} disabled={!closed.length} />
+          <Slider label="Closure lasts" unit="min" value={length} min={30} max={180} step={10} onChange={(v) => set({ length: v })} disabled={!closed.length} />
+          <Slider label="Priority people" unit="%" value={priority} min={0} max={30} step={5} onChange={(v) => set({ priority: v })} />
+          {source === 'offline' && (closed.length > 0 || priority > 0) && (
             <p className="num text-xs text-base">API offline: scenarios need the backend running.</p>
           )}
         </div>
@@ -72,10 +56,16 @@ export function AllocationPanel({ onResult }: { onResult: (r: SimResponse, s: So
         <div className={`space-y-6 transition-opacity duration-200 ${busy ? 'opacity-60' : ''}`} aria-busy={busy}>
           {result && (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Compare label="Average wait" unit="min" a={result.fcfs.avg_wait} b={result.queuepilot.avg_wait} />
-                <Compare label="Worst wait" unit="min" a={result.fcfs.max_wait} b={result.queuepilot.max_wait} />
+              <div className="grid gap-4 md:grid-cols-3">
+                <Compare label="Average wait" r={result} pick={(s) => s.avg_wait} />
+                <Compare label="95th-percentile wait" r={result} pick={(s) => s.p95_wait} />
+                <Compare label="Worst wait" r={result} pick={(s) => s.max_wait} />
               </div>
+
+              {priority > 0 && result.queuepilot.avg_wait_priority != null && (
+                <PriorityCallout r={result} />
+              )}
+
               <div>
                 <Label>Counter utilisation · % of the day busy</Label>
                 <div className="mt-3 space-y-3">
@@ -83,14 +73,20 @@ export function AllocationPanel({ onResult }: { onResult: (r: SimResponse, s: So
                     <div key={c.name} className="grid grid-cols-[36px_1fr] items-center gap-3">
                       <span className={`num text-sm ${closed.includes(c.name) ? 'text-alert' : 'text-dim'}`}>{c.name}</span>
                       <div className="space-y-1">
-                        <Bar pct={result.fcfs.utilisation[c.name]} color={BASE} />
-                        <Bar pct={result.queuepilot.utilisation[c.name]} color={QP} />
+                        {STRATEGIES.map((k) => <Bar key={k} pct={result[k].utilisation[c.name]} color={STRAT_STYLE[k].color} />)}
                       </div>
                     </div>
                   ))}
                   <Scale />
                 </div>
               </div>
+
+              <p className="num border-t border-line pt-3 text-[11px] leading-relaxed text-faint">
+                Fairness (Jain index of waits, 1 = everyone waits equally):{' '}
+                {STRATEGIES.map((k, i) => (
+                  <span key={k}>{i > 0 && ' · '}<span style={{ color: STRAT_STYLE[k].color }}>{result[k].jain_fairness.toFixed(2)}</span></span>
+                ))}
+              </p>
             </>
           )}
         </div>
@@ -109,24 +105,53 @@ function Slider(p: { label: string; unit: string; value: number; min: number; ma
   )
 }
 
-// Two horizontal bars on a shared scale + the % improvement.
-function Compare({ label, unit, a, b }: { label: string; unit: string; a: number; b: number }) {
-  const max = Math.max(a, b) * 1.1
-  const g = gain(a, b)
+// Three bars on a shared scale; the headline % is pooled vs shortest line.
+function Compare({ label, r, pick }: { label: string; r: SimResponse; pick: (s: SimResponse['fcfs']) => number }) {
+  const vals = STRATEGIES.map((k) => pick(r[k]))
+  const max = Math.max(...vals) * 1.1
+  const g = gain(vals[0], vals[2])
   return (
     <div className="border border-line bg-raised/60 p-4">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-2">
         <Label>{label}</Label>
         <span className={`num text-sm font-semibold ${g >= 0 ? 'text-qp' : 'text-alert'}`}>{g >= 0 ? '−' : '+'}{Math.abs(g).toFixed(1)}%</span>
       </div>
-      {[{ v: a, c: BASE }, { v: b, c: QP }].map(({ v, c }) => (
-        <div key={c} className="mt-3 flex items-center gap-3">
+      {STRATEGIES.map((k, i) => (
+        <div key={k} className="mt-2.5 flex items-center gap-3">
           <div className="h-2 flex-1 bg-line/60">
-            <div className="h-full transition-[width] duration-500" style={{ width: `${(v / max) * 100}%`, background: c }} />
+            <div className="h-full transition-[width] duration-500" style={{ width: `${(vals[i] / max) * 100}%`, background: STRAT_STYLE[k].color }} />
           </div>
-          <span className="num w-20 text-right text-sm">{v.toFixed(1)} <span className="text-faint">{unit}</span></span>
+          <span className="num w-14 text-right text-sm">{vals[i].toFixed(1)}</span>
         </div>
       ))}
+      <div className="num mt-2 text-right text-[10px] text-faint">minutes</div>
+    </div>
+  )
+}
+
+// Priority people (e.g. elderly, emergencies): how much faster are they served, and does anyone else pay for it?
+function PriorityCallout({ r }: { r: SimResponse }) {
+  const base = r.fcfs, qp = r.queuepilot
+  return (
+    <div className="grid gap-4 border border-qp/30 bg-qp/5 p-4 sm:grid-cols-2">
+      <div>
+        <Label>Priority people · avg wait</Label>
+        <div className="num mt-1 text-2xl">
+          <span className="text-base">{base.avg_wait_priority!.toFixed(1)}</span>
+          <span className="mx-2 text-faint">→</span>
+          <span className="text-qp">{qp.avg_wait_priority!.toFixed(1)}</span>
+          <span className="ml-1 text-sm text-faint">min</span>
+        </div>
+      </div>
+      <div>
+        <Label>Everyone else · avg wait</Label>
+        <div className="num mt-1 text-2xl">
+          <span className="text-base">{base.avg_wait_normal!.toFixed(1)}</span>
+          <span className="mx-2 text-faint">→</span>
+          <span className="text-ink">{qp.avg_wait_normal!.toFixed(1)}</span>
+          <span className="ml-1 text-sm text-faint">min</span>
+        </div>
+      </div>
     </div>
   )
 }

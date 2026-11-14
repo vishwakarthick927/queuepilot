@@ -16,8 +16,8 @@
 | E8 | Late binding: one pooled virtual queue, score = aging + priority − skill mismatch (WIN proposal 1) | MAIN | Done |
 | E9 | Fairness metrics p95 + Jain index (WIN proposal 4) | MAIN | Done |
 | E10 | trace timeline for animation (WIN proposal 5) | MAIN | Done |
-| F5 | Route panel v2: 3 strategies (labels), p95 + Jain, priority slider + callout | WIN | In progress |
-| F6 | Plan panel v2: staffing_comparison (same staff-minutes, peak 25→18), drop 57% claim | WIN | In progress |
-| F7 | Live replay: side-by-side animation from trace timeline, shortest line vs pooled | WIN | In progress |
+| F5 | Route panel v2: 3 strategies (labels), p95 + Jain, priority slider + callout | WIN | Done |
+| F6 | Plan panel v2: staffing_comparison (same staff-minutes, peak 25→18), drop 57% claim | WIN | Done |
+| F7 | Live replay: side-by-side animation from trace timeline, shortest line vs pooled | WIN | Done |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |
