@@ -7,9 +7,9 @@
 | E3 | /simulate and /forecast endpoints | MAIN | Done |
 | E4 | Combine: allocation uses hybrid forecast to pre-position counters | MAIN | Todo |
 | E5 | Scenario endpoint: counter closes at minute X, show recovery | MAIN | Done |
-| F1 | React + Vite dashboard skeleton, 3 panels | WIN | Todo |
-| F2 | Panel "Allocation": bar chart avg/max wait FCFS vs QueuePilot + utilisation | WIN | Todo |
-| F3 | Panel "Forecast": line chart actual vs physics vs data vs hybrid, plus error numbers | WIN | Todo |
-| F4 | Panel "Staffing plan": servers per 30-min block from /forecast | WIN | Todo |
+| F1 | React + Vite dashboard skeleton, 3 panels | WIN | In progress |
+| F2 | Panel "Allocation": bar chart avg/max wait FCFS vs QueuePilot + utilisation | WIN | In progress |
+| F3 | Panel "Forecast": line chart actual vs physics vs data vs hybrid, plus error numbers | WIN | In progress |
+| F4 | Panel "Staffing plan": servers per 30-min block from /forecast | WIN | In progress |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |
