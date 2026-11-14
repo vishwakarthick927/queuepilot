@@ -83,6 +83,14 @@ def test_waterfill_respects_site_cap():
     assert all(alloc[c["id"]] <= ev.accept_power(c["soc"]) + 1e-6 for c in cars)
 
 
+def test_perishable_sectors_queuepilot_loses_less():
+    from engine import perishable as per
+    for key in per.SECTORS:
+        r = per.compare_sector(key, runs=10)
+        assert r["queuepilot"]["lost_rs"] <= r["fcfs"]["lost_rs"], key
+        assert r["queuepilot"]["jobs"] == r["fcfs"]["jobs"]  # everyone still served
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):

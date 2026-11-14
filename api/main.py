@@ -102,3 +102,13 @@ def ev(runs: int = 80, temp: float = 1.0, avg_gap: float = 18.0):
             "charge_curve": [{"soc": round(x / 100, 2), "kw": round(evsim.accept_power(x / 100, temp), 1)}
                              for x in range(0, 101, 5)],
             "results": evsim.compare(runs, temp, avg_gap)}
+
+
+# ---------- one engine, many sectors (engine/perishable.py) ----------
+from engine import perishable as per
+
+
+@app.get("/sectors")
+def sectors(runs: int = 40, temp: float = 30.0):
+    """Perishable-queue sectors: FCFS vs QueuePilot in rupees lost. temp = ambient °C."""
+    return {k: per.compare_sector(k, runs, temp) for k in per.SECTORS}

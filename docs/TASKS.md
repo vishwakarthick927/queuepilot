@@ -24,5 +24,7 @@
 | E12 | Stable baseline (gap 2.5, n 300) + stress preset; mean ± 95% CI, win rate, per-service waits (REVIEW #1,#4,#5) | MAIN | Done |
 | E13 | EV charging hub: battery-physics queue, water-filling + dynamic cap (judges asked for a complex physics use case) | MAIN | Done |
 | F8 | EV panel: charge curve, 4-policy ablation bars, temp slider (calls GET /ev) | WIN | Todo |
+| E14 | Multi-sector perishable engine + /sectors + docs/SECTORS.md | MAIN | Done |
+| F9 | Sectors panel: card per sector (physics law, ₹ lost FCFS vs QP, rejected loads), temperature slider, one 'All sectors' summary | WIN | Todo |
 | P1 | PPT for judges | MAIN | Todo (after constraints) |
 | C* | Constraints from organisers: log in docs/CONSTRAINTS.md, add a task row each | whoever is free | — |

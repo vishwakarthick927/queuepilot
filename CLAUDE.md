@@ -48,6 +48,13 @@ QueuePilot-EV: water-filling power split + dynamic 80% cap while cars wait (neve
 GET /ev?runs=80&temp=1.0&avg_gap=18 → {"config": {...}, "charge_curve": [{"soc":0.0,"kw":60.0}, ...],
  "results": {"baseline"|"waterfill_only"|"cap_only"|"queuepilot": {"served","avg_wait","max_wait","avg_time_in_system","energy_kwh","need_met","avg_final_soc","avg_wait_ci95"}, "labels": {...}}}
 
+## Multi-sector engine: perishable queues (docs/SECTORS.md, engine/perishable.py)
+Pitch: one engine, any queue where the waiting item physically changes. Sector = physics module (state law, ₹ value, service time).
+Policy: serve max (₹ lost if it waits one more slot) / service minutes = cμ rule with physics-computed loss rates; worthless jobs last.
+40 days each, loss/day FCFS → QP: asphalt (15 °C) ₹14.5L → ₹3.7L (−74%), concrete ₹7.1L → ₹2.2L (−69%), milk (38 °C) ₹1.11L → ₹0.55L (−51%), sugarcane (38 °C) −11% (smooth decay; real lever is harvest scheduling).
+GET /sectors?runs=40&temp=30 → {sugarcane|asphalt|milk|concrete: {"sector","unit","physics","money","servers","temp_c",
+ "fcfs": {"jobs","value_rs","lost_rs","rejected","avg_wait"}, "queuepilot": {...}, "loss_cut_pct","saved_rs_per_day","win_rate"}}
+
 ## Repo layout & ownership
 | Path | Owner | Notes |
 |---|---|---|
@@ -89,6 +96,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 21:20 [MAIN] — E14: multi-sector perishable engine (sugarcane, asphalt, milk, concrete), GET /sectors, docs/SECTORS.md with business case. Main pitch not chosen yet; all sectors are backups/proof of generality. 12 tests pass.
 - 14 Nov 20:40 [MAIN] — E13: EV charging hub use case (battery-physics queue), engine/ev.py, GET /ev, docs/USE_CASE_EV.md. Wait −75%. 11 tests pass.
 - 14 Nov 20:15 [MAIN] — E11+E12 (REVIEW #1,#2,#4,#5): constrained residual, hybrid 1.8 vs physics 4.3; stable "normal" preset default; pooled 7.1→5.0 min (−30%, wins 100% of crowds); CI, win rate, per-service waits in /simulate. 9 tests pass.
 - 14 Nov 19:15 [WIN] — F5–F7 done: 3 strategies + p95 + Jain, priority slider + callout, staffing_comparison, 04 Replay (side-by-side animation + scrubber from timeline), URL scenarios (?close=C2&priority=10&t=22), per-panel error boundary. Build + lint clean, checked at 1440 and 500 px.
