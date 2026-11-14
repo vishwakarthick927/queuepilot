@@ -109,7 +109,7 @@ HTML = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Que
   <div class="kpis">
     <div><b>01 ROUTE</b><br>every ambulance to the fastest treatment: drive time + waiting time</div>
     <div><b>02 RADAR</b><br>a physics-guided neural network predicts each ER 30 minutes ahead</div>
-    <div><b>03 AUTOPILOT</b><br>acts on the radar: diverts ambulances, calls in doctors early</div>
+    <div><b>03 AUTOPILOT</b><br>acts on the radar: calls in off-duty doctors before the wave hits</div>
   </div>
 
   <h2>The problem, in one minute</h2>
@@ -122,17 +122,21 @@ HTML = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Que
   <div class="box"><b>Our idea:</b> before the ambulance leaves, predict the waiting time at every hospital.
   Send the patient where <b>drive time + waiting time</b> is shortest.</div>
 
-  <h2>What the demo shows (same city, same calls, two ways)</h2>
+  <h2>What the demo shows (same city, same emergency calls, three ways)</h2>
   <div class="shots">
-    <figure><img src="{img('radar.png')}"><figcaption><b>16:35, five minutes after a bus crash.</b> Nobody is waiting at East yet, but the AI radar already warns: <b>"18 waiting in 30 min"</b>. Today, nobody acts on that.</figcaption></figure>
-    <figure><img src="{img('queuepilot.png')}"><figcaption><b>17:20 with QueuePilot:</b> the victims were spread to Central, Ring Road and North. 8 patients in danger instead of 22.</figcaption></figure>
+    <figure><img src="{img('radar.png')}"><figcaption><b>Five minutes after a bus crash.</b> Nobody is waiting at East yet, but the AI radar already warns: <b>"18 waiting in 30 min"</b>. Today, nobody acts on that.</figcaption></figure>
+    <figure><img src="{img('autopilot.png')}"><figcaption><b>Festival crowd crush, Routing + AI Autopilot.</b> As soon as the radar saw the wave coming, it called in 2 off-duty doctors at each hospital in its path (green ticks).</figcaption></figure>
   </div>
-  <div class="kpis">
-    <div><div class="big"><span class="o">26</span> → <span class="g">0</span></div>patients who missed the golden hour in one afternoon</div>
-    <div><div class="big"><span class="o">21</span> → <span class="g">0</span></div>of 28 bus-crash victims treated too late</div>
-    <div><div class="big"><span class="o">46</span> → <span class="g">21</span> min</div>average time from call to doctor</div>
-  </div>
-  <p style="font-size:9.5pt;color:#555">Simulated city, 6 hospitals, ~150 emergencies in 6 hours + one bus crash (28 injured). Same result on 5 different random days: 26–37 late today vs 0–3 with QueuePilot.</p>
+  <table>
+    <tr><th>Patients who missed the golden hour<br>(one afternoon, ~150-190 emergencies)</th><th>Today:<br>nearest hospital</th><th>Smart<br>routing</th><th>Routing +<br>AI Autopilot</th></tr>
+    <tr><td><b>Festival crowd crush</b> (45 hurt)</td><td class="num">43-46</td><td class="num">15-32</td><td class="num"><b>1-3</b></td></tr>
+    <tr><td>Building collapse (40 hurt)</td><td class="num">48-59</td><td class="num">4-7</td><td class="num"><b>1-5</b></td></tr>
+    <tr><td>Bus crash (28 hurt)</td><td class="num">26-37</td><td class="num">0</td><td class="num"><b>0</b></td></tr>
+    <tr><td>Normal day</td><td class="num">0</td><td class="num">0</td><td class="num"><b>0, no false alarms</b></td></tr>
+  </table>
+  <p style="font-size:9.5pt;color:#555">Ranges = 3 different random days per scenario. Simulated city with 6 hospitals; nothing is tuned per scenario.
+  In the worst disaster, smart routing alone is not enough. The AI radar sees the wave 30 minutes early and calls in doctors, which saves almost everyone else.
+  Fair note: Autopilot uses extra staff (2 called-in doctors per alert; 8-12 in the crowd crush, 0 on a normal day).</p>
 </div>
 
 <div class="page">

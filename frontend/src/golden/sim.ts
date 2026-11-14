@@ -60,10 +60,14 @@ function makeIncidents(seed = 7, crash: Crash | null = CRASH, rate = 2.4) {
   return calls.sort((a, b) => a.t0 - b.t0)
 }
 
-export function simulate(policy: Policy, seed = 7, crash: Crash | null = CRASH, rate = 2.4): Patient[] {
+// extra = doctors called in: each one starts work at hospital `hospital` from minute `t`.
+export type Extra = { hospital: string; t: number }
+
+export function simulate(policy: Policy, seed = 7, crash: Crash | null = CRASH, rate = 2.4, extra: Extra[] = []): Patient[] {
   const calls = makeIncidents(seed, crash, rate)
   // What the dispatcher believes: when each doctor will be free, using AVERAGE treatment time only.
-  const est: Record<string, number[]> = Object.fromEntries(HOSPITALS.map((h) => [h.id, Array(h.doctors).fill(0)]))
+  const joins = (id: string) => extra.filter((e) => e.hospital === id).map((e) => e.t)   // a called-in doctor is 'busy' until they arrive
+  const est: Record<string, number[]> = Object.fromEntries(HOSPITALS.map((h) => [h.id, [...Array(h.doctors).fill(0), ...joins(h.id)]]))
 
   const chosen = calls.map((c) => {
     const arriveAt = (h: Hospital) => c.t0 + PICKUP + travel(c.x, c.y, h)
@@ -81,7 +85,7 @@ export function simulate(policy: Policy, seed = 7, crash: Crash | null = CRASH, 
   // What really happens: each ER treats patients in order of arrival with REAL treatment times.
   const out: Patient[] = []
   for (const h of HOSPITALS) {
-    const free = Array(h.doctors).fill(0)
+    const free = [...Array(h.doctors).fill(0), ...joins(h.id)]
     chosen.filter((c) => c.h.id === h.id).sort((a, b) => a.arrive - b.arrive).forEach((c) => {
       const i = free.indexOf(Math.min(...free))
       const start = Math.max(c.arrive, free[i])
@@ -96,8 +100,9 @@ export function simulate(policy: Policy, seed = 7, crash: Crash | null = CRASH, 
 }
 
 // State of the city at minute t (only uses what has happened by t).
-export function snapshot(ps: Patient[], t: number) {
-  const hospitals = HOSPITALS.map((h) => {
+export function snapshot(ps: Patient[], t: number, extra: Extra[] = []) {
+  const hospitals = HOSPITALS.map((base) => {
+    const h = { ...base, doctors: base.doctors + extra.filter((e) => e.hospital === base.id && e.t <= t).length }
     const mine = ps.filter((p) => p.hospital === h.id)
     const waiting = mine.filter((p) => p.arrive <= t && p.start > t).length
     const busy = mine.filter((p) => p.start <= t && p.end > t).length
