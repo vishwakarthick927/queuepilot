@@ -53,4 +53,5 @@ def forecast():
             "hybrid": [round(float(x), 1) for x in ph.rollout("hybrid", q[start], lam[start:], s[start:], _model, h)],
         },
         "staffing_plan": ph.recommend_staffing(_model),
+        "staffing_comparison": ph.compare_staffing(_model),
     }

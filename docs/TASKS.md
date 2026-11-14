@@ -5,7 +5,7 @@
 | E1 | Allocation simulation, FCFS vs QueuePilot | MAIN | Done |
 | E2 | Physics-guided hybrid forecaster (engine/physics.py) | MAIN | Done |
 | E3 | /simulate and /forecast endpoints | MAIN | Done |
-| E4 | Forecast-guided staffing vs fixed staffing (same staff-hours) | MAIN | In progress |
+| E4 | Forecast-guided staffing vs fixed staffing (same staff-hours) | MAIN | Done |
 | E5 | Scenario endpoint: counter closes at minute X, show recovery | MAIN | Done |
 | F1 | React + Vite dashboard skeleton, 3 panels | WIN | Todo |
 | F2 | Panel "Allocation": bar chart avg/max wait FCFS vs QueuePilot + utilisation | WIN | Todo |

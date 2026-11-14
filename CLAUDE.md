@@ -23,7 +23,8 @@ Our use (engine/physics.py):
 - Learned residual: what physics misses (people abandoning long lines). Ridge regression now; swappable for a small neural net.
 - Physics constraint on the learned part: the residual can never remove more people than are waiting.
 - Tested under distribution shift (staffing never seen in training): 60-min forecast error, physics 4.3, pure data 10.6, hybrid 3.0 people.
-- Decision layer: staffing plan per 30-min block via Little's law (W = queue / throughput) to keep wait ≤ 10 min.
+- Decision layer: staffing plan per 30-min block via Little's law (W = queue / throughput) to keep wait ≤ 5 min.
+- Same staff-hours, spent by the forecast instead of evenly: avg queue 6.2 → 5.3 (−15%), peak queue 25 → 18 (−27%).
 
 Three layers, one story: FORECAST (hybrid) → PLAN (staffing) → ROUTE (allocation).
 
@@ -54,7 +55,9 @@ Times in minutes, utilisation in %.
 
 GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 3.01},
  "example": {"minutes": [...60], "actual": [...], "physics": [...], "data": [...], "hybrid": [...]},
- "staffing_plan": [2,3,4,5,3,2,1,2,2,3,3,4,3,2,1,1]}   # servers per 30-min block, 8-hour day
+ "staffing_plan": [2,4,7,7,4,2,2,2,3,4,5,5,4,3,2,2],   # servers per 30-min block, 8-hour day
+ "staffing_comparison": {"fixed": {"avg_queue": 6.2, "peak_queue": 25.0, "avg_wait_min": 6.3, "staff_minutes": 1740},
+                         "planned": {"avg_queue": 5.3, "peak_queue": 18.3, "avg_wait_min": 5.4, "staff_minutes": 1740}}}
 
 ## Constraint cheat sheet
 - New service/counter → SERVICES / COUNTERS in engine/simulation.py
@@ -67,6 +70,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 14 Nov 17:05 [MAIN] — E4 done: /forecast adds staffing_comparison. Same staff-hours, forecast-planned vs even: peak queue −27%, avg −15%.
 - 14 Nov 16:55 [MAIN] — E5 done: /simulate accepts `closures`. 100-run avg wait: normal FCFS 16.5 vs QP 15.0; C2 closed 60–150 min: FCFS 23.5 vs QP 21.6.
 - 14 Nov 16:45 [MAIN] — Added physics-guided hybrid forecaster + /forecast, BRIDGE.md and TASKS.md. WIN: start F1–F4.
 - 14 Nov 13:15 — Repo created: engine simulation + /simulate API scaffold. Frontend not started.
