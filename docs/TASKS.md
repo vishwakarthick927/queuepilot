@@ -6,7 +6,7 @@
 | E2 | Physics-guided hybrid forecaster (engine/physics.py) | MAIN | Done |
 | E3 | /simulate and /forecast endpoints | MAIN | Done |
 | E4 | Combine: allocation uses hybrid forecast to pre-position counters | MAIN | Todo |
-| E5 | Scenario endpoint: counter closes at minute X, show recovery | MAIN | Todo |
+| E5 | Scenario endpoint: counter closes at minute X, show recovery | MAIN | In progress |
 | F1 | React + Vite dashboard skeleton, 3 panels | WIN | Todo |
 | F2 | Panel "Allocation": bar chart avg/max wait FCFS vs QueuePilot + utilisation | WIN | Todo |
 | F3 | Panel "Forecast": line chart actual vs physics vs data vs hybrid, plus error numbers | WIN | Todo |
