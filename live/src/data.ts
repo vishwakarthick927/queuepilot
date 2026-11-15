@@ -64,29 +64,30 @@ export function densityAt(run: Run, f: number): number[] {
 export const fmt1 = (x: number) => x.toFixed(1)
 
 // ---------------------------------------------------------------- version 2: the plaza grid and the two models
+// The Crush-Point Finder's plaza (MAIN engine/plaza.py v3: continuity + Weidmann + Hughes + Helbing pressure).
+export type PlazaModel = { label: string; density: number[][][]; density_error: number; crush_cells_true: number; found: number; missed: number; false_alarms: number }
 export type Plaza = {
   height: number; width: number; cell_m: number; frame_s: number; danger_density: number; max_density: number
-  total_people: number; gate: number[][]; clutter: number[][]; passability_true: number[][]
-  truth: { density: number[][][]; peak_density: number; danger_cells: number }
-  textbook: { density: number[][][]; peak_density: number; danger_cells: number }
-  danger_cells_textbook_misses: number
+  total_people: number; gate: number[][]; clutter: number[][]; usable_share_true: number[][]
+  constants: { v0: number; gamma: number; rho_max: number; source: string }
+  truth: { density: number[][][]; pressure: number[][][]; peak_density: number; peak_pressure: number; through: number[]; waiting_outside: number[] }
+  models: { shortest_path: PlazaModel; hughes: PlazaModel }
 }
 export const PLAZA = files['../../data/crowd/plaza_demo.json'] as Plaza
 
 // Model results (WIN research/live). A file that is not there yet means that model is still training: show no numbers.
 const results = import.meta.glob('../../research/live/*.json', { eager: true, import: 'default' }) as Record<string, unknown>
-export type PgcnnResult = {
-  models: Record<'physics' | 'cnn' | 'pgcnn', { density_error: number; people_created: number; danger_cells_true: number; danger_cells_found: number; danger_cells_missed: number; false_alarm_cells: number; plazas: number }>
-  passability_error: { site_plan: number; pgcnn: number }
-  setup: { train_plazas: number; test_plazas: number }
+// research/live/pgcnn_plaza.json, same shape as plaza_demo.json models.* plus the learned usable floor and held-out averages
+export type PgcnnResult = PlazaModel & {
+  usable_share_learned: number[][]
+  held_out: Record<string, { density_error: number; found: number; missed: number; false_alarms: number; crush_cells_true: number }> & { plazas: number }
 }
-export type PgcnnDemo = { density: number[][][]; peak_density: number; danger_cells: number; passability: number[][]; textbook_missed_cells_we_catch: number; textbook_missed_cells: number }
+export type PgcnnDemo = never
 export type PggnnResult = {
   models: Record<'physics' | 'gnn' | 'pggnn', { peak_density_err: number; peak_ci95: number; danger_start_err_min: number; danger_yes_no_agree_pct: number; people_created_or_lost: number; runs: number }>
   setup: { train_runs: number; test_runs: number; unseen: string }
 }
 export type PggnnDemo = { venues: Record<string, { worst: number[]; danger_at_min: number | null; peak_density: number }> }
 export const PGCNN = results['../../research/live/pgcnn_plaza.json'] as PgcnnResult | undefined
-export const PGCNN_DEMO = results['../../research/live/pgcnn_plaza_demo.json'] as PgcnnDemo | undefined
 export const PGGNN = results['../../research/live/pggnn_venue.json'] as PggnnResult | undefined
 export const PGGNN_DEMO = results['../../research/live/pggnn_venue_demo.json'] as PggnnDemo | undefined

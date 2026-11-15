@@ -83,8 +83,8 @@ export default function VenueMap({ venue, density, openGates, flowing, learned, 
             <rect x={q.x - q.w / 2} y={q.y - q.h / 2} width={q.w} height={q.h} rx={7} fill={densityColor(d, danger)} />
             {zoom && (
               <g className="zoom-tag" transform={`translate(${q.x - q.w / 2 + 7}, ${q.y + q.h / 2 - 16})`}>
-                <rect x={0} y={0} width={30} height={11} rx={2} />
-                <text x={15} y={8} textAnchor="middle">GRID ↗</text>
+                <rect x={0} y={0} width={62} height={11} rx={2} />
+                <text x={31} y={8} textAnchor="middle">CRUSH POINTS ↗</text>
               </g>
             )}
             <text x={q.x - q.w / 2 + 7} y={q.y - q.h / 2 + 13} className={d > danger * 0.62 && !hot ? 'zname on-light' : 'zname'}>

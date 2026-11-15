@@ -6,7 +6,7 @@ import { NowRail, DoRail } from './Rails'
 import HowItWorks from './HowItWorks'
 import Physics from './Physics'
 import ModelStrip from './ModelStrip'
-import PlazaView, { type PlazaSource } from './PlazaView'
+import CrushFinder from './CrushFinder'
 
 // Modes: what no one does (today), the twin + an approved plan (qp), or both at once (side).
 export type Mode = 'today' | 'qp' | 'side'
@@ -38,7 +38,7 @@ export default function App() {
   const [physics, setPhysics] = useState(q.get('physics') === '1')
   const closePhysics = useCallback(() => setPhysics(false), [])
   const [plaza, setPlaza] = useState(q.get('plaza') === '1')
-  const [plazaSrc, setPlazaSrc] = useState<PlazaSource>((q.get('src') as PlazaSource) ?? 'real')
+  const closePlaza = useCallback(() => setPlaza(false), [])
 
   const alarmF = frameAt(venue, venue.forecast.alarm_at_min)
   const dangerF = frameAt(venue, venue.today.danger_at_min)
@@ -160,7 +160,7 @@ export default function App() {
         </nav>
       </header>
       <ModelStrip venue={venue} stage={stage} onOpen={openStage} />
-      <main className="body">
+      {plaza ? <main className="body crush-body"><CrushFinder onClose={closePlaza} /></main> : <main className="body">
         <NowRail venue={venue} run={run} f={f} planOn={planOn} twinOn={mode !== 'today'}
           other={mode === 'side' ? venue.today : undefined} />
         <section className="center">
@@ -174,18 +174,14 @@ export default function App() {
               Peak crowd <b className="num">{fmt1(venue.today.peak_density)}</b> → <b className="num qp">{fmt1(venue.with_queuepilot.peak_density)}</b> people per m².
             </p>
           </div>
-          {plaza ? (
-            <div className="stage"><PlazaView venue={venue} f={f} source={plazaSrc} onSource={setPlazaSrc} onBack={() => setPlaza(false)} /></div>
-          ) : (
-            <div className={mode === 'side' ? 'stage split' : 'stage'}>
-              {mode === 'side' ? <>{pane(false)}{pane(true)}</> : pane(planOn)}
-            </div>
-          )}
+          <div className={mode === 'side' ? 'stage split' : 'stage'}>
+            {mode === 'side' ? <>{pane(false)}{pane(true)}</> : pane(planOn)}
+          </div>
           <Timeline venue={venue} f={f} playing={playing} showQp={mode !== 'today'} approved={planOn}
             onSeek={(x) => { setF(x); setPlaying(false) }} onPlay={play} />
         </section>
         <DoRail key={venue.id} venue={venue} f={f} twinOn={mode !== 'today'} approved={planOn} onApprove={approve} />
-      </main>
+      </main>}
       <footer className="foot">
         <span>Simulated crowd on a schematic layout. A person approves every action. Counts only, no faces.</span>
         <span className="spacer" />
