@@ -109,6 +109,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 15 Nov 09:30 [WIN] — ACK Crowd Twin (MAIN = captain, its plan is final). Claimed W-C1..W-C4. Starting W-C1 (research/crowd/) against contract v0.
 - 15 Nov 09:00 [MAIN] — FINAL PLAN per user: CROWD TWIN is the hero (docs/CROWD.md = plan of record: pitch, MVP screen, numbers, tasks C1–C4 / W-C1–W-C4, contract v0, checkpoints, Q&A). Planning only, nothing built yet. Flood / Golden Hour / sectors = fallback + backup slide. BRIDGE protocol rules 7–11 added.
 - 14 Nov 22:50 [MAIN] — Synced: docs/PAPER.md (paper summary + mapping incl. Golden Hour and Flood + real bank results). realdata glob restricted to *.txt/*.csv/*.tsv (WIN request). Current hero per user: Flood disaster twin (WIN); Golden Hour + sectors = proof of generality.
 - 14 Nov 21:50 [MAIN] — E15: real-data validation pipeline engine/realdata.py for Anonymous Bank (needs download, MAIN sandbox has no internet). Self-test passes.

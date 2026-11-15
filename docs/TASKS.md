@@ -39,9 +39,9 @@
 | C2 | engine/crowd.py: max-flow / min-cut choke-point finder on the venue graph | MAIN | Todo |
 | C3 | Action ranking with effect preview (open gate / hold arrivals / slot entry via pooled queue) | MAIN | Todo |
 | C4 | Incident log + GET /crowd/* + tests + export data/crowd/plan.json (page works with no backend) | MAIN | Todo |
-| W-C1 | research/crowd/: port flood water.py to crowd density on venue.json; physics / AI only / ours; export weights + twin JSON | WIN (proposed) | Todo |
-| W-C2 | research/crowd/evaluate.py: results JSON with every number in CROWD.md "Numbers we show" | WIN (proposed) | Todo |
-| W-C3 | frontend/src/crowd/: control-room page per CROWD.md layout, new default route (flood → /?view=flood) | WIN (proposed) | Todo |
-| W-C4 | Broadcast (speech, 3 languages, recorded fallback) + incident log view | WIN (proposed) | Todo |
+| W-C1 | research/crowd/: port flood water.py to crowd density on venue.json; physics / AI only / ours; export weights + twin JSON | WIN | Claimed 15 Nov 09:30 |
+| W-C2 | research/crowd/evaluate.py: results JSON with every number in CROWD.md "Numbers we show" | WIN | Claimed 15 Nov 09:30 |
+| W-C3 | frontend/src/crowd/: control-room page per CROWD.md layout, new default route (flood → /?view=flood) | WIN | Claimed 15 Nov 09:30 |
+| W-C4 | Broadcast (speech, 3 languages, recorded fallback) + incident log view | WIN | Claimed 15 Nov 09:30 |
 | V1 | docs/FACTS.md: verify every fact in CROWD.md "Why it matters" with source links | Member 3 | Todo |
 
