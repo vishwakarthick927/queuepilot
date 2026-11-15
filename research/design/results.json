@@ -1,0 +1,55 @@
+{
+ "models": {
+  "pggnn": {
+   "clearance_err_s": 4.7,
+   "ci95": 0.7,
+   "people_error": 0.0,
+   "runs": 320
+  },
+  "gnn": {
+   "clearance_err_s": 51.7,
+   "ci95": 6.9,
+   "people_error": 328.15,
+   "runs": 320
+  },
+  "physics": {
+   "clearance_err_s": 21.0,
+   "ci95": 2.3,
+   "people_error": 0.0,
+   "runs": 320
+  }
+ },
+ "speed": {
+  "pggnn_per_s": 60.6,
+  "simulator_per_s": 79.6
+ },
+ "setup": {
+  "source": "MAIN engine.design_data (data/design/train.npz)",
+  "train_runs": 1280,
+  "test_runs": 320,
+  "dt_s": 2,
+  "max_steps": 300,
+  "channels": true,
+  "ratio": true,
+  "unseen": "16 floor plans never seen in training",
+  "simulated": true,
+  "chosen_variant": "C"
+ },
+ "ablation": [
+  {
+   "label": "PG-GNN, fix 3 (train from t = 0)",
+   "clearance_err_s": 6.0,
+   "ci95": 0.9
+  },
+  {
+   "label": "+ fix 2 (door demand ratio)",
+   "clearance_err_s": 5.7,
+   "ci95": 0.8
+  },
+  {
+   "label": "+ fix 1 (destination channels)",
+   "clearance_err_s": 4.7,
+   "ci95": 0.7
+  }
+ ]
+}

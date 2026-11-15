@@ -22,13 +22,12 @@ type Props = {
   ours?: boolean                       // green = QueuePilot's exits; white = any other layout
 }
 
-// One sequential scale for density, same everywhere on the page (legend under the plan).
+// One sequential scale for density, single hue (amber), dark = empty to light = crowded, same everywhere.
 export const DENSITY_STOPS = [0, 1, 2, 3, 4]
 export function densityColor(d: number) {
   const t = Math.max(0, Math.min(1, d / 4))
-  const a = [30, 39, 52], b = [242, 165, 65], c = [255, 77, 77]       // empty -> amber -> red at 4 people/m²
-  const [p, q, u] = t < 0.5 ? [a, b, t / 0.5] : [b, c, (t - 0.5) / 0.5]
-  return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * u)).join(',')})`
+  const lo = [38, 34, 28], hi = [255, 214, 150]                       // 0 -> 4+ people/m²
+  return `rgb(${lo.map((v, i) => Math.round(v + (hi[i] - v) * Math.sqrt(t))).join(',')})`
 }
 
 export default function PlanView({ plan, exits, blocked = null, people, fireNode, closed = [], minCut = [], value = {}, compact, ours = true }: Props) {
@@ -81,10 +80,15 @@ export default function PlanView({ plan, exits, blocked = null, people, fireNode
           <rect x={n.x - ROOM / 2} y={n.y - ROOM / 2} width={ROOM} height={ROOM} rx={0.2}
             fill={people ? densityColor(density(n.id)) : 'var(--color-raised)'} stroke="var(--color-line-strong)" strokeWidth="0.12" />
           {fireNode === n.id && <rect x={n.x - ROOM / 2} y={n.y - ROOM / 2} width={ROOM} height={ROOM} fill={`url(#${hatch})`} stroke="var(--color-alert)" strokeWidth="0.3" />}
-          <text x={n.x} y={n.y} fontSize={compact ? 1.5 : 1.2} textAnchor="middle" dominantBaseline="central" className="num"
-            fill={people ? 'var(--color-ink)' : 'var(--color-dim)'}>
-            {people ? Math.round(people[n.id]) : `${Math.round(n.area_m2)} m²`}
-          </text>
+          {people ? (
+            <text x={n.x} y={n.y} fontSize={1.7} textAnchor="middle" dominantBaseline="central" className="num" fontWeight={600}
+              fill={density(n.id) > 1.6 ? 'var(--color-bg)' : 'var(--color-ink)'}>{Math.round(people[n.id])}</text>
+          ) : (
+            <text x={n.x} y={n.y} fontSize={1.05} textAnchor="middle" className="num">
+              <tspan x={n.x} dy="-0.2em" fill="var(--color-ink)">{n.name?.replace('Room ', 'R') ?? `R${n.id}`}</tspan>
+              <tspan x={n.x} dy="1.35em" fill="var(--color-dim)">{Math.round(n.area_m2)} m²</tspan>
+            </text>
+          )}
         </g>
       ))}
 

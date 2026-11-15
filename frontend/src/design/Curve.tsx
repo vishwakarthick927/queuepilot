@@ -10,15 +10,17 @@ export default function Curve({ curve, limit, selected, onPick, ours }: { curve:
         onClick={(s) => { const n = Number(s?.activeLabel); if (n) onPick(n) }}>
         <CartesianGrid stroke="var(--color-line)" vertical={false} />
         <XAxis dataKey="n_exits" tick={tick} stroke="var(--color-line-strong)" tickLine={false}
-          label={{ value: 'exits', position: 'insideBottomRight', offset: -2, fill: 'var(--color-faint)', fontSize: 12 }} />
+          label={{ value: 'exits', position: 'insideBottomRight', offset: -2, fill: 'var(--color-faint)', fontSize: 13 }} />
         <YAxis tick={tick} stroke="var(--color-line-strong)" tickLine={false} width={46} unit=" s" />
         <ReferenceLine y={limit} stroke="var(--color-alert)" strokeDasharray="5 4"
-          label={{ value: `safe limit ${limit} s`, position: 'right', fill: 'var(--color-alert)', fontSize: 12 }} />
+          label={{ value: `limit ${limit} s`, position: 'insideTopLeft', fill: 'var(--color-alert)', fontSize: 13 }} />
         <ReferenceLine x={selected} stroke="var(--color-line-strong)" />
         <Tooltip contentStyle={{ background: 'var(--color-panel)', border: '1px solid var(--color-line-strong)', fontFamily: 'var(--font-mono)', fontSize: 13 }}
           labelFormatter={(n) => `${n} exits`} formatter={(v, k) => [`${v} s`, k === 'ours_s' ? 'QueuePilot' : 'Rule of thumb']} />
-        <Line dataKey="rule_s" stroke="var(--color-dim)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
-        {ours && <Line dataKey="ours_s" stroke="var(--color-qp)" strokeWidth={2.5} dot={{ r: 3.5 }} isAnimationActive={false} />}
+        <Line dataKey="rule_s" name="Rule of thumb" stroke="var(--color-ink)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false}
+          label={(p: { index?: number; x?: number | string; y?: number | string }) => p.index === curve.length - 1 ? <text x={Number(p.x ?? 0) + 8} y={Number(p.y ?? 0) + 14} fill="var(--color-ink)" fontSize={13}>rule of thumb</text> : <g />} />
+        {ours && <Line dataKey="ours_s" name="QueuePilot" stroke="var(--color-qp)" strokeWidth={2.5} dot={{ r: 3.5 }} isAnimationActive={false}
+          label={(p: { index?: number; x?: number | string; y?: number | string }) => p.index === curve.length - 1 ? <text x={Number(p.x ?? 0) + 8} y={Number(p.y ?? 0) - 6} fill="var(--color-qp)" fontSize={13}>QueuePilot</text> : <g />} />}
       </LineChart>
     </ResponsiveContainer>
   )
