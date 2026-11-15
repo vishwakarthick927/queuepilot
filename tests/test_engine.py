@@ -91,6 +91,53 @@ def test_perishable_sectors_queuepilot_loses_less():
         assert r["queuepilot"]["jobs"] == r["fcfs"]["jobs"]  # everyone still served
 
 
+# ---- QueuePilot Design (docs/BUILD.md): floor plans, evacuation simulator, exit design ----
+def _demo():
+    from engine import plans
+    return plans.demo_plan()
+
+
+def test_plan_graph_is_valid():
+    p = _demo()
+    ids = {n["id"] for n in p["nodes"]}
+    assert all(e["a"] in ids and e["b"] in ids for e in p["edges"])
+    assert all(p["nodes"][c["node"]]["kind"] == "exit" for c in p["candidates"])
+    assert p["candidates"][p["main_entrance"]]["familiarity"] == 1.0
+
+
+def test_evacuation_conserves_people():
+    from engine import evac
+    p = _demo()
+    r = evac.simulate(p, [c["id"] for c in p["candidates"]], fire=p["fires"][0], panic=0.8)
+    inside_plus_out = r["people"].sum(1) + r["evacuated"]
+    assert np.allclose(inside_plus_out, r["total"], atol=1e-2)       # nobody created or lost, at every step
+    assert r["people"].min() >= -1e-6
+
+
+def test_panic_slows_evacuation_and_crowds_the_main_exit():
+    from engine import evac
+    p = _demo()
+    exits = [c["id"] for c in p["candidates"]][:4]
+    calm, panic = evac.simulate(p, exits, panic=0.0), evac.simulate(p, exits, panic=0.8)
+    main = p["main_entrance"]
+    assert panic["clearance_s"] > calm["clearance_s"]
+    assert panic["exit_use"][main] > calm["exit_use"][main]
+
+
+def test_lost_exit_is_not_used():
+    from engine import evac
+    p = _demo()
+    r = evac.simulate(p, [0, 1, 2], lost_exit=1, panic=0.5)
+    assert r["exit_use"][1] == 0.0
+
+
+def test_maxflow_bound_is_below_simulated_time():
+    from engine import design, evac
+    p = _demo()
+    layout = [c["id"] for c in p["candidates"]][:3]
+    assert design.flow_bound(p, layout)["bound_s"] <= evac.simulate(p, layout, panic=0.0)["clearance_s"]
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):

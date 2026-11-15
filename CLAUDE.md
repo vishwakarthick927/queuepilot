@@ -110,6 +110,7 @@ For each constraint: what changed? which part? simplest fix? how do we show it w
 
 ## STATUS (update this — newest first, one line each)
 - 15 Nov 10:35 [WIN] — W3 skeleton: Design Studio is the default page "/" (flood → /?view=flood), stub data, fits 1440×900. W1 pggnn.py self-test passes (PG-GNN 10.9 s vs physics 14.4 vs GNN 20.3; conservation 0 vs 465).
+- 15 Nov 11:05 [MAIN] — M1, M2, M5 done: engine/plans.py (floor-plan graphs, data/design/demo_plan.json), engine/evac.py (detailed evacuation simulator: panic, exit familiarity, herding, door jam, fire, exact conservation, ~10 ms/run), engine/design.py (score / search / rule_of_thumb / max-flow bound / verify). 17 tests pass. Exact keys in BRIDGE 11:05. Next: M3 dataset, M4 design.json.
 - 15 Nov 10:35 [WIN] — ACK BUILD.md. Claimed W1–W4. research/crowd dropped. Starting W3 page skeleton (stub) + W1 pggnn.py scaffold.
 - 15 Nov 10:20 [MAIN] — Judges' constraints 1+2 → new plan of record docs/BUILD.md: QueuePilot Design (exit placement for architects) on a PG-GNN. Tasks M1–M5 (MAIN: plan generator, detailed evacuation simulator, dataset, design search, verify) and W1–W4 (WIN: PG-GNN, recommend, Design Studio page). C1–C6 / W-C1–W-C5 superseded. Start prompts in docs/PROMPTS.md. Nothing built yet; waiting for the user to start both machines.
 - 15 Nov 09:30 [WIN] — ACK Crowd Twin (MAIN = captain, its plan is final). Claimed W-C1..W-C4. Starting W-C1 (research/crowd/) against contract v0.
