@@ -181,12 +181,12 @@ def frames(plan, layout, fire, panic):
                 exit_use={str(k): round(v, 1) for k, v in r["exit_use"].items()})
 
 
-def across_plans(n_plans=30, first_seed=1000):
+def across_plans(n_plans=20, first_seed=1000):
     """Honesty check: not just the demo plan. On random plans, how many exits does each approach need?"""
     rows = []
     for seed in range(first_seed, first_seed + n_plans):
         p = plans.make_plan(seed, n_candidates=8)
-        k_ours, _ = fewest_passing(search(p, k_max=6))
+        k_ours, _ = fewest_passing(search(p, k_max=5))
         k_rule, _ = fewest_rule_of_thumb(p)
         rows.append(dict(plan=p["id"], shape=p["shape"], people=plans.total_people(p), ours=k_ours, rule=k_rule))
     both = [r for r in rows if r["ours"] and r["rule"]]
@@ -227,6 +227,8 @@ def build(plan, with_across=True):
         cost_of_panic=dict(calm_s=calm["worst_case_s"], panic_s=main["chosen"]["worst_case_s"] if main["chosen"] else None),
         frames=dict(chosen=frames(plan, chosen, worst_fire, DESIGN_PANIC),
                     rule_of_thumb=frames(plan, same_count_rule, worst_fire, DESIGN_PANIC)))
+    out["frames_fire"] = worst_fire["id"]
+    out["m2_per_exit"] = EXIT_CORE_M2
     if with_across:
         out["across_plans"] = across_plans()
     return out
@@ -236,10 +238,14 @@ if __name__ == "__main__":
     plan = json.loads((OUT / "demo_plan.json").read_text())
     if len(sys.argv) > 2 and sys.argv[1] == "verify":
         print(json.dumps(verify(plan, json.loads(sys.argv[2])), indent=1))
+    elif len(sys.argv) > 1 and sys.argv[1] == "across":          # slow part, added to the existing file
+        d = json.loads((OUT / "design.json").read_text())
+        d["across_plans"] = across_plans()
+        (OUT / "design.json").write_text(json.dumps(d))
+        print({k: v for k, v in d["across_plans"].items() if k != "rows"})
     else:
-        d = build(plan)
+        d = build(plan, with_across=False)
         (OUT / "design.json").write_text(json.dumps(d))
         m = d["by_panic"][str(DESIGN_PANIC)]
         print("chosen", m["chosen"]); print("rule  ", m["rule_of_thumb"]); print("rule, same count", m["rule_same_count"])
         print("bound", d["bound_maxflow_s"], "min cut", d["min_cut"], "| cost of panic", d["cost_of_panic"])
-        print({k: v for k, v in d["across_plans"].items() if k != "rows"})

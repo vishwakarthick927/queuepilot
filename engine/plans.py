@@ -57,8 +57,14 @@ def make_plan(seed, shape=None, n_candidates=10, name=None):
     nodes, edges, candidates = [], [], []
     cell_node = {}
 
+    SIZE = dict(room=5.4, corridor=6.0, exit=3.0)        # drawing size of each tile in metres (for the page only)
+    count = dict(room=0, corridor=0, exit=0)
+
     def add_node(kind, gx, gy, area, people):
-        nodes.append(dict(id=len(nodes), kind=kind, x=gx * CELL, y=gy * CELL, area_m2=round(area, 1), people0=people))
+        count[kind] += 1
+        label = dict(room="Room", corridor="Corridor", exit="Exit")[kind] + " " + (chr(64 + count[kind]) if kind == "exit" else str(count[kind]))
+        nodes.append(dict(id=len(nodes), kind=kind, name=label, x=gx * CELL, y=gy * CELL, w_m=SIZE[kind], h_m=SIZE[kind],
+                          area_m2=round(area, 1), people0=people))
         return len(nodes) - 1
 
     def add_edge(a, b, width, length, candidate=None):
