@@ -5,6 +5,9 @@ To explain the research paper (plain words, section by section, how we use it, r
 Then read docs/BRIDGE.md (protocol + MESSAGES between machines) and docs/TASKS.md (who is doing what).
 Before starting any task: `git pull`. After finishing any working feature: update the STATUS section below, commit, `git pull --rebase`, `git push`.
 
+## CURRENT PLAN (15 Nov)
+Hero = **Crowd Twin** (crowd-crush early warning for control rooms). Read docs/CROWD.md before any work. Everything below is still true and stays as proof / fallback.
+
 ## Event
 ZeroHour hackathon, Shunya, PES University, 14–15 Nov 2026. Team "Counter Intelligence". Track 3: Optimization, Graph Theory & Intelligent Systems.
 Rounds: Day 1 development + mentor reviews (cut), Day 2 final coding + evaluation. Constraints are revealed progressively during the event.
@@ -106,6 +109,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 15 Nov 09:00 [MAIN] — FINAL PLAN per user: CROWD TWIN is the hero (docs/CROWD.md = plan of record: pitch, MVP screen, numbers, tasks C1–C4 / W-C1–W-C4, contract v0, checkpoints, Q&A). Planning only, nothing built yet. Flood / Golden Hour / sectors = fallback + backup slide. BRIDGE protocol rules 7–11 added.
 - 14 Nov 22:50 [MAIN] — Synced: docs/PAPER.md (paper summary + mapping incl. Golden Hour and Flood + real bank results). realdata glob restricted to *.txt/*.csv/*.tsv (WIN request). Current hero per user: Flood disaster twin (WIN); Golden Hour + sectors = proof of generality.
 - 14 Nov 21:50 [MAIN] — E15: real-data validation pipeline engine/realdata.py for Anonymous Bank (needs download, MAIN sandbox has no internet). Self-test passes.
 - 14 Nov 21:20 [MAIN] — E14: multi-sector perishable engine (sugarcane, asphalt, milk, concrete), GET /sectors, docs/SECTORS.md with business case. Main pitch not chosen yet; all sectors are backups/proof of generality. 12 tests pass.

@@ -1,4 +1,5 @@
 # QueuePilot — the plan to win (v2, 14 Nov 19:30, WIN)
+SUPERSEDED on 15 Nov by docs/CROWD.md (plan of record). Kept for history.
 Built from: the original plan, a judge-style red team of the engine (docs/REVIEW.md), and a check of the paper's actual text.
 MAIN decides engine order; this is a proposal. Rule: every claim on a slide must survive "show me".
 
