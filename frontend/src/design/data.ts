@@ -36,7 +36,9 @@ export type Results = {
   setup?: { test_runs?: number; unseen?: string }
 }
 export type Recommend = {
-  agreement?: { top1: number; top5: number }
+  agreement?: { top1: number; top5: number; exit_counts?: number[] }
+  agreement_physics_only?: { top1: number; top5: number }
+  screen_seconds?: number
   candidate_value: { id: number; score: number }[]
   screened: number
   top5: { exits: number[]; predicted_s: number | null; verified_s: number | null }[]

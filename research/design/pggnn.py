@@ -129,13 +129,18 @@ class Graph:
         self.t_pair = torch.tensor(np.arange(len(self.src)) ^ 1)                 # the same door, other direction
         self.t_cap_door = T(self.width * self.flow_per_m * self.dt)
         self.t_len, self.t_cap_people, self.t_area, self.t_exit = T(self.length), T(self.cap_people), T(self.area), T(self.is_exit)
+        # everything that only changes when a fire closes a door: computed once per fire stage, not every step
+        self.cache = {s: (T(self.close > s), static_node(self, s), static_edge(self, s)) for s in self.stages}
+
+    def stage(self, step):
+        return max(s for s in self.stages if s <= step)
 
     def open_at(self, step):
         """Which directed doors are usable at this step (unbuilt exits, fire, no walking back from exits)."""
-        return torch.tensor(self.close > step, dtype=torch.float32)
+        return self.cache[self.stage(step)][0]
 
     def route_at(self, step):
-        return self.route[max(s for s in self.stages if s <= step)]
+        return self.route[self.stage(step)]
 
 
 # ---------------------------------------------------------------- the physics (shared by physics + pggnn)
@@ -156,23 +161,31 @@ def physics_step(g, people, share, eff, open_):
 
 
 # ---------------------------------------------------------------- the GNN (message passing by hand)
+def static_node(g, s):
+    """The fixed part of what a node knows at fire stage s: size, type, distance to an exit, fire, panic."""
+    kind = np.eye(4)[g.kind]
+    near = np.minimum(np.nan_to_num(g.route[s]["near"], posinf=300.0), 300) / 50
+    x = np.column_stack([np.log(g.area) / 5, kind, near, g.fire, g.panic])
+    return torch.tensor(x, dtype=torch.float32)
+
+
+def static_edge(g, s):
+    """What every door knows at fire stage s: width, length, the textbook choice, how familiar and how far
+    the exits it leads to are, and whether it is open."""
+    r = g.route[s]
+    via = np.minimum(np.nan_to_num(r["via"], posinf=300.0), 300) / 50
+    x = np.column_stack([g.width / 2, g.length / 10, r["phys"], r["fam"], via, g.close > s])
+    return torch.tensor(x, dtype=torch.float32)
+
+
 def node_features(g, people, step):
-    """What every node knows right now: crowding, size, type, distance to an exit, fire, panic."""
+    """What every node knows right now: how crowded it is, plus the fixed part above."""
     density = people / g.t_area * (1 - g.t_exit) / g.max_density
-    kind = torch.nn.functional.one_hot(torch.tensor(g.kind), 4).float()
-    near = np.nan_to_num(g.route_at(step)["near"], posinf=300.0)
-    T = lambda x: torch.tensor(np.asarray(x), dtype=torch.float32)[:, None]
-    return torch.cat([density[:, None], torch.log(g.t_area[:, None]) / 5, kind, T(np.minimum(near, 300) / 50),
-                      T(g.fire), T(g.panic)], 1)
+    return torch.cat([density[:, None], g.cache[g.stage(step)][1]], 1)
 
 
 def edge_features(g, step, open_):
-    """What every door knows: width, length, open, the textbook choice, how familiar and how far
-    the exits it leads to are."""
-    r = g.route_at(step)
-    via = np.minimum(np.nan_to_num(r["via"], posinf=300.0), 300) / 50
-    x = np.stack([g.width / 2, g.length / 10, r["phys"], r["fam"], via], 1)
-    return torch.cat([torch.tensor(x, dtype=torch.float32), open_[:, None]], 1)
+    return g.cache[g.stage(step)][2]
 
 
 N_NODE, N_EDGE = 9, 6
@@ -251,7 +264,7 @@ class PhysicsOnly:
 
     def step(self, g, people, step):
         open_ = g.open_at(step)
-        share = torch.tensor(g.route_at(step)["phys"], dtype=torch.float32)
+        share = g.cache[g.stage(step)][2][:, 2]                        # the textbook door, from the cache
         return physics_step(g, people, share, torch.ones(len(g.src)), open_)
 
 
@@ -324,13 +337,15 @@ def main_runs(max_steps=300):
 
 
 # ---------------------------------------------------------------- training + test
-def train(model, runs, iters, horizon=20, lr=3e-3, batch=8):
+def train(model, runs, iters, horizon=40, lr=2e-3, batch=8):
     """Pick runs and start times, roll the model forward `horizon` steps, match the simulator inside the building.
-    Runs in one batch share a start time, so the fire stage is right for all of them."""
+    Runs in one batch share a start time, so the fire stage is right for all of them.
+    Loss = error per node + error in the number of people still inside (what decides the clearance time)."""
     opt = torch.optim.Adam(model.parameters(), lr=lr)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters)
     r = np.random.default_rng(0)
     for i in range(iters):
-        t0 = int(r.integers(0, 40))
+        t0 = int(r.integers(0, 100))
         picks = [runs[int(k)] for k in r.integers(len(runs), size=4 * batch)]
         picks = [(g, t) for g, t in picks if len(t) > t0 + horizon][:batch]
         if not picks:
@@ -339,8 +354,11 @@ def train(model, runs, iters, horizon=20, lr=3e-3, batch=8):
         p0 = torch.cat([t[t0] for _, t in picks])
         target = torch.cat([t[t0 + 1:t0 + 1 + horizon] for _, t in picks], 1)
         pred = rollout(model, b, p0, t0, horizon)
-        loss = ((((pred - target) * (1 - b.t_exit)) / 10) ** 2).mean()
-        opt.zero_grad(); loss.backward(); opt.step()
+        keep = 1 - b.t_exit
+        node_err = ((((pred - target) * keep) / 10) ** 2).mean()
+        inside_err = (((inside(pred, b) - inside(target, b)) / 10) ** 2).mean()
+        loss = node_err + 0.1 * inside_err
+        opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step(); sched.step()
         if i % 100 == 0:
             print(f"    iter {i:4d}  loss {loss.item():.4f}", flush=True)
     return model
@@ -388,7 +406,7 @@ def main():
     torch.manual_seed(0)
     if a.quick:
         rng = np.random.default_rng(0)
-        train_runs = sim_runs(range(100, 140), 6, 300, rng)              # 40 plans for training
+        train_runs = sim_runs(range(100, 200), 8, 300, rng)              # 100 plans for training
         test_runs = sim_runs(range(900, 912), 6, 300, rng)               # 12 plans never seen in training
     else:
         runs, plan_of = main_runs()

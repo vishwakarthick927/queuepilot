@@ -65,9 +65,15 @@ export default function ModelDrawer({ open, onClose, plan, results, recommend, s
           </section>
         )}
         {recommend?.agreement && (
-          <p className="text-[15px] text-dim">Does the PG-GNN pick the truly best layout? Matches the detailed simulator's best layout{' '}
-            <span className="num text-ink">{Math.round(recommend.agreement.top1 * 100)}%</span> of the time; the best is in its top 5{' '}
-            <span className="num text-ink">{Math.round(recommend.agreement.top5 * 100)}%</span>.</p>
+          <section className="space-y-2">
+            <Head n="B" title="Does the screen pick the simulator's best layout?" tag={<Tag>simulated</Tag>} />
+            <div className="num grid grid-cols-[150px_1fr_1fr] gap-y-1 text-[15px]">
+              <span className="text-faint" /><span className="text-faint">best = its pick</span><span className="text-faint">best in its top 5</span>
+              {recommend.agreement_physics_only && <><span>Physics only</span><span>{Math.round(recommend.agreement_physics_only.top1 * 100)}%</span><span>{Math.round(recommend.agreement_physics_only.top5 * 100)}%</span></>}
+              <span className="text-qp">PG-GNN (ours)</span><span>{Math.round(recommend.agreement.top1 * 100)}%</span><span>{Math.round(recommend.agreement.top5 * 100)}%</span>
+            </div>
+            <p className="text-[13px] text-faint">Demo plan, panic 0.8, one check per exit count {recommend.agreement.exit_counts ? `(${recommend.agreement.exit_counts.join(', ')} exits)` : ''}, against MAIN's full simulator ranking.</p>
+          </section>
         )}
         <p className="mt-auto text-[13px] text-faint">Method: Yu &amp; Wang, "Learning dynamical systems from data: an introduction to physics-guided deep learning", PNAS 2024, §3A (constrained hybrid), §4A (generalisation). Training data: our detailed evacuation simulator with hidden panic and exit familiarity. All results simulated.</p>
       </aside>
