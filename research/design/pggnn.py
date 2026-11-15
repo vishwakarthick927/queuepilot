@@ -41,10 +41,10 @@ torch.set_num_threads(4)
 
 
 # ---------------------------------------------------------------- plan -> graph tensors
-def shortest_dist(n, src, dst, length, open_):
+def shortest_dist(n, src, dst, length, open_, exits):
     """Metres from every node to the nearest open exit (Bellman-Ford on a tiny graph)."""
     d = np.full(n, np.inf)
-    d[EXIT_NODES] = 0.0
+    d[exits] = 0.0
     for _ in range(n):
         alt = d[dst] + length                                  # walk i -> j, then j's distance
         alt[~open_] = np.inf
@@ -56,14 +56,10 @@ def shortest_dist(n, src, dst, length, open_):
     return d
 
 
-EXIT_NODES = None   # set per graph inside build(); keeps shortest_dist's signature short
-
-
 class Graph:
     """Everything the models need about ONE plan + ONE exit layout + ONE fire, as tensors."""
 
     def __init__(self, plan, exits, fire=None, panic=0.0):
-        global EXIT_NODES
         nodes, cands = plan["nodes"], plan["candidates"]
         self.n, self.dt = len(nodes), plan["dt_s"]
         self.area = np.array([max(1.0, nd["area_m2"]) for nd in nodes])
@@ -87,12 +83,31 @@ class Graph:
         self.people0 = np.array([float(nd["people0"]) for nd in nodes])
         self.cap_people = np.where(self.is_exit, 1e9, self.area * plan["max_density"])
         self.max_density, self.flow_per_m = plan["max_density"], plan["flow_per_m_s"]
-        self.panic = panic
-        self.fire_node = -1 if fire is None else fire["start_node"]
-        EXIT_NODES = self.exit_nodes
+        self.panic = np.full(self.n, panic)                       # per node, so graphs can be batched
+        self.fire = np.zeros(self.n)
+        if fire is not None:
+            self.fire[fire["start_node"]] = 1.0
         self.stages = sorted({0} | {int(s) for s in self.close if s < 10 ** 9})
-        self.dist = {s: shortest_dist(self.n, self.src, self.dst, self.length, self.close > s) for s in self.stages}
+        self.dist = {s: shortest_dist(self.n, self.src, self.dst, self.length, self.close > s, self.exit_nodes) for s in self.stages}
+        self.sizes = [self.n]
         self.torch()
+
+    @staticmethod
+    def batch(gs):
+        """Many graphs as ONE big graph with no doors between them, so one rollout scores them all."""
+        b = Graph.__new__(Graph)
+        off = np.cumsum([0] + [g.n for g in gs[:-1]])
+        cat = lambda k: np.concatenate([getattr(g, k) for g in gs])
+        for k in ("area", "is_exit", "kind", "people0", "cap_people", "width", "length", "close", "fam_exit", "panic", "fire"):
+            setattr(b, k, cat(k))
+        b.src = np.concatenate([g.src + o for g, o in zip(gs, off)])
+        b.dst = np.concatenate([g.dst + o for g, o in zip(gs, off)])
+        b.n, b.dt, b.sizes = int(sum(g.n for g in gs)), gs[0].dt, [g.n for g in gs]
+        b.max_density, b.flow_per_m = gs[0].max_density, gs[0].flow_per_m
+        b.stages = sorted({s for g in gs for s in g.stages})
+        b.dist = {s: np.concatenate([g.dist_at(s) for g in gs]) for s in b.stages}
+        b.torch()
+        return b
 
     def torch(self):
         """Tensor copies used inside the rollout."""
@@ -148,17 +163,15 @@ def node_features(g, people, step):
     density = people / g.t_area * (1 - g.t_exit) / g.max_density
     kind = torch.nn.functional.one_hot(torch.tensor(g.kind), 4).float()
     d = torch.tensor(np.minimum(g.dist_at(step), 300.0) / 100.0, dtype=torch.float32)
-    fire = torch.zeros(g.n)
-    if g.fire_node >= 0:
-        fire[g.fire_node] = 1.0
-    return torch.cat([density[:, None], torch.log(g.t_area[:, None]) / 5, kind, d[:, None], fire[:, None],
-                      torch.full((g.n, 1), g.panic)], 1)
+    fire, panic = torch.tensor(g.fire, dtype=torch.float32), torch.tensor(g.panic, dtype=torch.float32)
+    return torch.cat([density[:, None], torch.log(g.t_area[:, None]) / 5, kind, d[:, None], fire[:, None], panic[:, None]], 1)
 
 
 def edge_features(g, step, open_):
     """What every door knows: width, length, does it lead to a familiar exit, is it downhill."""
     d = g.dist_at(step)
-    downhill = np.clip((d[g.src] - d[g.dst]) / 20.0, -2, 2)
+    with np.errstate(invalid="ignore"):                       # inf - inf where both ends are cut off
+        downhill = np.clip((d[g.src] - d[g.dst]) / 20.0, -2, 2)
     downhill[~np.isfinite(downhill)] = 0.0
     x = np.stack([g.width / 2, g.length / 20, g.fam_exit, downhill], 1)
     return torch.cat([torch.tensor(x, dtype=torch.float32), open_[:, None]], 1)
@@ -254,6 +267,16 @@ def clearance_step(traj, g):
     return int(hit[0]) + 1 if len(hit) else None
 
 
+def clearance_steps(traj, b):
+    """clearance_step for every graph inside a batch (None = never cleared)."""
+    inside = (traj * (1 - b.t_exit)).split(b.sizes, dim=1)
+    out = []
+    for part in inside:
+        hit = torch.nonzero(part.sum(1) < 1.0)
+        out.append(int(hit[0]) + 1 if len(hit) else None)
+    return out
+
+
 # ---------------------------------------------------------------- self-test truth (until MAIN's simulator lands)
 class ToyTruth:
     """Hidden behaviour the models are never told: doors jam when crowded and panicked,
@@ -263,10 +286,11 @@ class ToyTruth:
         open_ = g.open_at(step)
         d = torch.tensor(np.nan_to_num(g.dist_at(step), posinf=1e3), dtype=torch.float32)
         via = d[g.t_dst] + g.t_len
-        logits = -via / (8 + 12 * g.panic) + (2 + 3 * g.panic) * torch.tensor(g.fam_exit, dtype=torch.float32)
+        p = torch.tensor(g.panic, dtype=torch.float32)[g.t_src]
+        logits = -via / (8 + 12 * p) + (2 + 3 * p) * torch.tensor(g.fam_exit, dtype=torch.float32)
         share = masked_softmax(logits, g.t_src, g.n, open_)
         density = (people / g.t_area * (1 - g.t_exit))[g.t_src] / g.max_density
-        eff = 1 / (1 + (0.5 + 2 * g.panic) * density)
+        eff = 1 / (1 + (0.5 + 2 * p) * density)
         return physics_step(g, people, share, eff, open_)[0]
 
 
