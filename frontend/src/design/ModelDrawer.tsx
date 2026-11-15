@@ -64,7 +64,7 @@ export default function ModelDrawer({ open, onClose, plan, results, recommend, s
             </div>
           </section>
         )}
-        {recommend && (
+        {recommend?.agreement && (
           <p className="text-[15px] text-dim">Does the PG-GNN pick the truly best layout? Matches the detailed simulator's best layout{' '}
             <span className="num text-ink">{Math.round(recommend.agreement.top1 * 100)}%</span> of the time; the best is in its top 5{' '}
             <span className="num text-ink">{Math.round(recommend.agreement.top5 * 100)}%</span>.</p>

@@ -1,115 +1,132 @@
 import { useId } from 'react'
-import { exitsOf, type Plan } from './data'
+import { exitLabel, type Plan } from './data'
 
 // The floor plan, drawn in metres (SVG viewBox = metres), so every size on screen is to scale.
-// Rooms are tinted by crowd density (people per m²) when an animation frame is passed in.
+// MAIN's plans sit on a 6 m grid: a room fills its grid cell, a corridor is a band as wide as its
+// passage, an exit sits outside the wall it opens from. Rooms are tinted by crowd density when an
+// animation frame is passed in.
+
+const CELL = 6            // grid spacing of engine/plans.py, metres
+const ROOM = 5.6          // drawn room size inside its cell (the rest is wall)
 
 type Props = {
   plan: Plan
-  exits: number                       // layout bitmask over plan.candidates
-  people?: number[]                   // people per node at the current step (animation)
+  exits: number[]                      // candidate ids built in this layout
+  blocked?: number | null              // a built exit the fire has blocked (drawn crossed out)
+  people?: number[]                    // people per node at the current step (animation)
   fireNode?: number | null
-  minCut?: number[]                   // edge indices to widen
-  value?: Record<string, number>      // candidate id -> value score (marker size)
-  label?: string
+  closed?: number[]                    // edges cut by the fire at this moment
+  minCut?: number[]                    // edges to widen
+  value?: Record<number, number>       // candidate id -> value score (marker size)
   compact?: boolean
-  ours?: boolean                      // green = QueuePilot's exits; white = any other layout
+  ours?: boolean                       // green = QueuePilot's exits; white = any other layout
 }
 
-// One sequential scale for density, same everywhere on the page (legend in the plan footer).
+// One sequential scale for density, same everywhere on the page (legend under the plan).
 export const DENSITY_STOPS = [0, 1, 2, 3, 4]
 export function densityColor(d: number) {
   const t = Math.max(0, Math.min(1, d / 4))
-  const a = [24, 32, 43], b = [242, 165, 65], c = [255, 77, 77]        // empty -> amber -> red at 4 p/m²
+  const a = [30, 39, 52], b = [242, 165, 65], c = [255, 77, 77]       // empty -> amber -> red at 4 people/m²
   const [p, q, u] = t < 0.5 ? [a, b, t / 0.5] : [b, c, (t - 0.5) / 0.5]
   return `rgb(${p.map((v, i) => Math.round(v + (q[i] - v) * u)).join(',')})`
 }
 
-// Rectangle of a node (drawing hint w_m/h_m if MAIN sends it, else a square of the same area).
-function box(n: Plan['nodes'][number]) {
-  const w = n.w_m ?? Math.sqrt(Math.max(n.area_m2, 4)), h = n.h_m ?? Math.sqrt(Math.max(n.area_m2, 4))
-  return { x: n.x - w / 2, y: n.y - h / 2, w, h }
-}
-
-export default function PlanView({ plan, exits, people, fireNode, minCut = [], value = {}, label, compact, ours = true }: Props) {
-  const ex = ours ? 'var(--color-qp)' : 'var(--color-ink)'
+export default function PlanView({ plan, exits, blocked = null, people, fireNode, closed = [], minCut = [], value = {}, compact, ours = true }: Props) {
   const hatch = useId()
-  const inside = plan.nodes.filter(n => n.kind !== 'exit')
-  const boxes = inside.map(box)
-  const x0 = Math.min(...boxes.map(b => b.x)), x1 = Math.max(...boxes.map(b => b.x + b.w))
-  const y0 = Math.min(...boxes.map(b => b.y)), y1 = Math.max(...boxes.map(b => b.y + b.h))
-  const pad = compact ? 4 : 9                                           // compact = the side-by-side view: use every pixel
-  const top = compact ? 0 : 4                                           // room for the dimension line
-  const vb = `${x0 - pad} ${y0 - pad - top} ${x1 - x0 + 2 * pad} ${y1 - y0 + 2 * pad + top}`
-  const on = new Set(exitsOf(exits, plan).map(c => c.id))
+  const N = plan.nodes
+  const xs = N.map(n => n.x), ys = N.map(n => n.y)
+  const x0 = Math.min(...xs) - CELL / 2, x1 = Math.max(...xs) + CELL / 2
+  const y0 = Math.min(...ys) - CELL / 2, y1 = Math.max(...ys) + CELL / 2
+  const top = compact ? 0 : 4                                              // room for the dimension line
+  const vb = `${x0 - 1} ${y0 - 1 - top} ${x1 - x0 + 2} ${y1 - y0 + 2 + top}`
+  const built = new Set(exits)
+  const ex = ours ? 'var(--color-qp)' : 'var(--color-ink)'
   const maxVal = Math.max(1, ...Object.values(value).map(Math.abs))
-  const fs = compact ? 2.6 : 2.1                                        // text size in metres
+  const walls = N.filter(n => n.kind !== 'exit')
+  const bx0 = Math.min(...walls.map(n => n.x)) - CELL / 2, bx1 = Math.max(...walls.map(n => n.x)) + CELL / 2
+  const density = (i: number) => (people ? people[i] / Math.max(N[i].area_m2, 1) : 0)
+  const corridorEdges = plan.edges.map((e, i) => ({ e, i })).filter(({ e }) => N[e.a].kind === 'corridor' && N[e.b].kind === 'corridor')
 
   return (
-    <svg viewBox={vb} className="h-full w-full" role="img" aria-label={`Floor plan ${plan.name}${label ? ', ' + label : ''}`}>
+    <svg viewBox={vb} className="h-full w-full" role="img" aria-label={`Floor plan: ${plan.name}`}>
       <defs>
-        <pattern id={hatch} width="1.6" height="1.6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="1.6" stroke="var(--color-alert)" strokeWidth="0.5" />
+        <pattern id={hatch} width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="1.2" stroke="var(--color-alert)" strokeWidth="0.35" />
         </pattern>
       </defs>
 
-      {/* overall dimension line along the top: the drawing's scale, like an architect's sheet */}
-      {!compact && <g className="num" stroke="var(--color-faint)" strokeWidth="0.15" fill="var(--color-faint)">
-        <line x1={x0} y1={y0 - 5} x2={x1} y2={y0 - 5} />
-        <line x1={x0} y1={y0 - 6.2} x2={x0} y2={y0 - 3.8} /><line x1={x1} y1={y0 - 6.2} x2={x1} y2={y0 - 3.8} />
-        <text x={(x0 + x1) / 2} y={y0 - 6} fontSize={fs * 0.85} textAnchor="middle" stroke="none">{(x1 - x0).toFixed(1)} m</text>
-      </g>}
+      {/* overall dimension line, like an architect's sheet */}
+      {!compact && (
+        <g className="num" stroke="var(--color-faint)" strokeWidth="0.1" fill="var(--color-faint)">
+          <line x1={bx0} y1={y0 - 2.5} x2={bx1} y2={y0 - 2.5} />
+          <line x1={bx0} y1={y0 - 3.3} x2={bx0} y2={y0 - 1.7} /><line x1={bx1} y1={y0 - 3.3} x2={bx1} y2={y0 - 1.7} />
+          <text x={(bx0 + bx1) / 2} y={y0 - 3} fontSize={1.3} textAnchor="middle" stroke="none">{(bx1 - bx0).toFixed(0)} m</text>
+        </g>
+      )}
 
-      {/* rooms and corridors */}
-      {inside.map((n, i) => {
-        const b = boxes[i], d = people ? people[n.id] / Math.max(n.area_m2, 1) : 0
-        return (
-          <g key={n.id}>
-            <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={people ? densityColor(d) : 'var(--color-raised)'}
-              fillOpacity={people ? 0.85 : 1} stroke="var(--color-line-strong)" strokeWidth="0.25" />
-            {fireNode === n.id && <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={`url(#${hatch})`} stroke="var(--color-alert)" strokeWidth="0.5" />}
-            {n.kind !== 'corridor' && b.h > 6 && (
-              <text x={n.x} y={n.y} fontSize={fs} textAnchor="middle" dominantBaseline="middle" fill="var(--color-ink)" className="num">
-                <tspan x={n.x} dy={people ? '-0.5em' : 0}>{n.name || `#${n.id}`}</tspan>
-                {people && <tspan x={n.x} dy="1.2em" fill="var(--color-dim)">{Math.round(people[n.id])}</tspan>}
-              </text>
-            )}
-          </g>
-        )
+      {/* corridors: bands between corridor nodes, as wide as the passage */}
+      {corridorEdges.map(({ e, i }) => {
+        const a = N[e.a], b = N[e.b], cut = closed.includes(i)
+        const d = (density(e.a) + density(e.b)) / 2
+        return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} strokeWidth={e.width_m + 0.6} strokeLinecap="square"
+          stroke={cut ? 'var(--color-alert)' : people ? densityColor(d) : 'var(--color-raised)'} />
       })}
+      {N.filter(n => n.kind === 'corridor').map(n => (
+        <rect key={n.id} x={n.x - 1.5} y={n.y - 1.5} width={3} height={3} fill={people ? densityColor(density(n.id)) : 'var(--color-raised)'} />
+      ))}
 
-      {/* doors: a short bar at the midpoint between the two spaces, as wide as the door */}
+      {/* rooms: one grid cell each; floor area, or people inside when animating */}
+      {N.filter(n => n.kind === 'room').map(n => (
+        <g key={n.id}>
+          <rect x={n.x - ROOM / 2} y={n.y - ROOM / 2} width={ROOM} height={ROOM} rx={0.2}
+            fill={people ? densityColor(density(n.id)) : 'var(--color-raised)'} stroke="var(--color-line-strong)" strokeWidth="0.12" />
+          {fireNode === n.id && <rect x={n.x - ROOM / 2} y={n.y - ROOM / 2} width={ROOM} height={ROOM} fill={`url(#${hatch})`} stroke="var(--color-alert)" strokeWidth="0.3" />}
+          <text x={n.x} y={n.y} fontSize={compact ? 1.5 : 1.2} textAnchor="middle" dominantBaseline="central" className="num"
+            fill={people ? 'var(--color-ink)' : 'var(--color-dim)'}>
+            {people ? Math.round(people[n.id]) : `${Math.round(n.area_m2)} m²`}
+          </text>
+        </g>
+      ))}
+
+      {/* doors from rooms: a small bar on the room's wall, as wide as the door */}
       {plan.edges.map((e, i) => {
-        const a = plan.nodes[e.a], b = plan.nodes[e.b]
-        if (a.kind === 'corridor' && b.kind === 'corridor') return null
-        const vertical = Math.abs(a.y - b.y) > Math.abs(a.x - b.x)
-        const r = a.kind === 'room' ? a : b, c = r === a ? b : a
-        const my = vertical ? c.y + Math.sign(r.y - c.y) * ((c.h_m ?? 2.4) / 2) : (a.y + b.y) / 2
-        const mx = vertical ? r.x : (a.x + b.x) / 2
+        const r = N[e.a].kind === 'room' ? N[e.a] : N[e.b].kind === 'room' ? N[e.b] : null
+        if (!r || e.candidate !== null) return null
+        const c = r === N[e.a] ? N[e.b] : N[e.a]
+        const vertical = Math.abs(r.y - c.y) > Math.abs(r.x - c.x)
+        const mx = vertical ? r.x : r.x + Math.sign(c.x - r.x) * ROOM / 2
+        const my = vertical ? r.y + Math.sign(c.y - r.y) * ROOM / 2 : r.y
         const cut = minCut.includes(i)
-        return (
-          <g key={i}>
-            <rect x={vertical ? mx - e.width_m / 2 : mx - 0.4} y={vertical ? my - 0.4 : my - e.width_m / 2}
-              width={vertical ? e.width_m : 0.8} height={vertical ? 0.8 : e.width_m}
-              fill={cut ? 'var(--color-qp)' : 'var(--color-bg)'} stroke={cut ? 'var(--color-qp)' : 'var(--color-dim)'} strokeWidth="0.2" />
-            {cut && !compact && <text x={mx + 1.6} y={my + (r.y > c.y ? 2.6 : -1.6)} fontSize={fs * 0.85} fill="var(--color-qp)" className="num">widen {e.width_m} m</text>}
-          </g>
-        )
+        return <rect key={i} x={vertical ? mx - e.width_m / 2 : mx - 0.25} y={vertical ? my - 0.25 : my - e.width_m / 2}
+          width={vertical ? e.width_m : 0.5} height={vertical ? 0.5 : e.width_m}
+          fill={cut ? 'var(--color-qp)' : 'var(--color-bg)'} stroke={cut ? 'var(--color-qp)' : 'var(--color-dim)'} strokeWidth="0.1" />
       })}
 
-      {/* candidate exits: ring = possible, filled = in this layout; size = value score */}
+      {/* the bottleneck passage (min-cut) on corridors, outlined */}
+      {minCut.map(i => {
+        const e = plan.edges[i]
+        if (!e || N[e.a].kind !== 'corridor' || N[e.b].kind !== 'corridor') return null
+        const a = N[e.a], b = N[e.b]
+        return <line key={'cut' + i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--color-qp)" strokeWidth={0.25} strokeDasharray="0.6 0.4" />
+      })}
+
+      {/* candidate exits: ring = possible position, filled = built in this layout; size = value score */}
       {plan.candidates.map(c => {
-        const n = plan.nodes[c.node], at = plan.nodes[c.attach_to], sel = on.has(c.id)
-        const ab = box(at)                                                // the passage starts at the wall, not the room centre
-        const wx = Math.max(ab.x, Math.min(ab.x + ab.w, n.x)), wy = Math.max(ab.y, Math.min(ab.y + ab.h, n.y))
-        const r = 1.3 + 1.6 * Math.abs(value[c.id] ?? 0) / maxVal
+        const n = N[c.node], at = N[c.attach_to], on = built.has(c.id)
+        const r = 1.0 + 1.1 * Math.abs(value[c.id] ?? 0) / maxVal
         return (
           <g key={c.id}>
-            {sel && <line x1={wx} y1={wy} x2={n.x} y2={n.y} stroke={ex} strokeWidth="0.35" strokeDasharray={c.id === plan.main_entrance ? undefined : '1 0.6'} />}
-            <circle cx={n.x} cy={n.y} r={r} fill={sel ? ex : 'var(--color-bg)'}
-              stroke={sel ? ex : 'var(--color-faint)'} strokeWidth="0.25" strokeDasharray={sel ? undefined : '0.6 0.5'} />
-            <text x={n.x} y={n.y} fontSize={fs * 0.8} textAnchor="middle" dominantBaseline="central" fontWeight={600}
-              fill={sel ? 'var(--color-bg)' : 'var(--color-faint)'} className="num">{c.id}</text>
+            {on && <line x1={at.x} y1={at.y} x2={n.x} y2={n.y} stroke={ex} strokeWidth={c.width_m / 3} />}
+            <circle cx={n.x} cy={n.y} r={r} fill={on ? ex : 'var(--color-bg)'}
+              stroke={on ? ex : 'var(--color-faint)'} strokeWidth="0.15" strokeDasharray={on ? undefined : '0.45 0.35'} />
+            <text x={n.x} y={n.y} fontSize={compact ? 1.25 : 1.05} textAnchor="middle" dominantBaseline="central" fontWeight={600}
+              fill={on ? 'var(--color-bg)' : 'var(--color-faint)'} className="num">{exitLabel(c.id)}</text>
+            {blocked === c.id && (
+              <g stroke="var(--color-alert)" strokeWidth="0.45" strokeLinecap="round">
+                <line x1={n.x - r - 0.4} y1={n.y - r - 0.4} x2={n.x + r + 0.4} y2={n.y + r + 0.4} />
+                <line x1={n.x - r - 0.4} y1={n.y + r + 0.4} x2={n.x + r + 0.4} y2={n.y - r - 0.4} />
+              </g>
+            )}
           </g>
         )
       })}
