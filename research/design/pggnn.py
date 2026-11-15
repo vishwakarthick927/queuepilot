@@ -310,6 +310,28 @@ def selftest_runs(n_plans, seed0, steps):
     return runs
 
 
+# ---------------------------------------------------------------- MAIN's dataset (engine.design_data, M3)
+DATA = OUT.parents[1] / "data" / "design"
+
+
+def main_runs(max_steps=300):
+    """Rows of train.npz (or sample.npz) as (graph, people[step][node]) pairs, plus each row's plan index.
+    Arrays may be padded to the largest plan / longest run; we cut each row back to its plan's size."""
+    plans = json.loads((DATA / "plans.json").read_text())
+    f = DATA / "train.npz" if (DATA / "train.npz").exists() else DATA / "sample.npz"
+    z = np.load(f, allow_pickle=True)
+    runs, plan_of = [], []
+    for r in range(len(z["plan_index"])):
+        plan = plans[int(z["plan_index"][r])]
+        fire = int(z["fire"][r])
+        g = Graph(plan, int(z["exits"][r]), plan["fires"][fire] if fire >= 0 else None, float(z["panic"][r]))
+        people = np.asarray(z["people"][r], dtype=np.float32)[:max_steps + 1, :g.n]
+        runs.append((g, torch.tensor(people)))
+        plan_of.append(int(z["plan_index"][r]))
+    print(f"loaded {len(runs)} runs on {len(plans)} plans from {f.name}")
+    return runs, np.array(plan_of)
+
+
 # ---------------------------------------------------------------- training + test
 def train(model, runs, iters, horizon=30, lr=3e-3):
     """Pick a run and a start time, roll the model forward `horizon` steps, match the simulator."""
@@ -356,21 +378,28 @@ def main():
     ap.add_argument("--iters", type=int, default=600)
     a = ap.parse_args()
     torch.manual_seed(0)
-    if not a.selftest:
-        raise SystemExit("MAIN's dataset (engine.design_data) has not landed yet: run with --selftest")
-    steps = 200
-    train_runs, test_runs = selftest_runs(16, 0, steps), selftest_runs(6, 500, steps)   # test = unseen plans
+    if a.selftest:
+        steps = 200
+        train_runs, test_runs = selftest_runs(16, 0, steps), selftest_runs(6, 500, steps)   # test = unseen plans
+    else:
+        runs, plan_of = main_runs()
+        unseen = plan_of % 5 == 0                                  # every 5th floor plan is never trained on
+        train_runs = [r for r, u in zip(runs, unseen) if not u]
+        test_runs = [r for r, u in zip(runs, unseen) if u]
+        steps = len(runs[0][1]) - 1
     models = {"physics": PhysicsOnly(), "gnn": GNNOnly(), "pggnn": PGGNN()}
     for name in ("gnn", "pggnn"):
         print("training", name)
         train(models[name], train_runs, a.iters)
     res = {"models": {k: test(m, test_runs) for k, m in models.items()},
            "speed": {"pggnn_per_s": speed(models["pggnn"], test_runs[0][0], steps)},
-           "setup": {"source": "SELFTEST toy plans + toy truth (not MAIN's simulator)", "train_runs": len(train_runs),
-                     "test_runs": len(test_runs), "steps": steps, "dt_s": 2}}
+           "setup": {"source": "SELFTEST toy plans + toy truth (not MAIN's simulator)" if a.selftest else "MAIN engine.evac dataset",
+                     "train_runs": len(train_runs), "test_runs": len(test_runs), "steps": steps, "dt_s": 2,
+                     "unseen": "test plans never appear in training"}}
     print(json.dumps(res, indent=1))
-    (OUT / "results_selftest.json").write_text(json.dumps(res, indent=1))
-    torch.save(models["pggnn"].state_dict(), OUT / "pggnn_selftest.pt")
+    tag = "_selftest" if a.selftest else ""
+    (OUT / f"results{tag}.json").write_text(json.dumps(res, indent=1))
+    torch.save(models["pggnn"].state_dict(), OUT / f"pggnn{tag}.pt")
 
 
 if __name__ == "__main__":

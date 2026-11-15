@@ -13,6 +13,7 @@ type Props = {
   value?: Record<string, number>      // candidate id -> value score (marker size)
   label?: string
   compact?: boolean
+  ours?: boolean                      // green = QueuePilot's exits; white = any other layout
 }
 
 // One sequential scale for density, same everywhere on the page (legend in the plan footer).
@@ -30,7 +31,8 @@ function box(n: Plan['nodes'][number]) {
   return { x: n.x - w / 2, y: n.y - h / 2, w, h }
 }
 
-export default function PlanView({ plan, exits, people, fireNode, minCut = [], value = {}, label, compact }: Props) {
+export default function PlanView({ plan, exits, people, fireNode, minCut = [], value = {}, label, compact, ours = true }: Props) {
+  const ex = ours ? 'var(--color-qp)' : 'var(--color-ink)'
   const hatch = useId()
   const inside = plan.nodes.filter(n => n.kind !== 'exit')
   const boxes = inside.map(box)
@@ -103,9 +105,9 @@ export default function PlanView({ plan, exits, people, fireNode, minCut = [], v
         const r = 1.3 + 1.6 * Math.abs(value[c.id] ?? 0) / maxVal
         return (
           <g key={c.id}>
-            {sel && <line x1={wx} y1={wy} x2={n.x} y2={n.y} stroke="var(--color-qp)" strokeWidth="0.35" strokeDasharray={c.id === plan.main_entrance ? undefined : '1 0.6'} />}
-            <circle cx={n.x} cy={n.y} r={r} fill={sel ? 'var(--color-qp)' : 'var(--color-bg)'}
-              stroke={sel ? 'var(--color-qp)' : 'var(--color-faint)'} strokeWidth="0.25" strokeDasharray={sel ? undefined : '0.6 0.5'} />
+            {sel && <line x1={wx} y1={wy} x2={n.x} y2={n.y} stroke={ex} strokeWidth="0.35" strokeDasharray={c.id === plan.main_entrance ? undefined : '1 0.6'} />}
+            <circle cx={n.x} cy={n.y} r={r} fill={sel ? ex : 'var(--color-bg)'}
+              stroke={sel ? ex : 'var(--color-faint)'} strokeWidth="0.25" strokeDasharray={sel ? undefined : '0.6 0.5'} />
             <text x={n.x} y={n.y} fontSize={fs * 0.8} textAnchor="middle" dominantBaseline="central" fontWeight={600}
               fill={sel ? 'var(--color-bg)' : 'var(--color-faint)'} className="num">{c.id}</text>
           </g>

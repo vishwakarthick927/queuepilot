@@ -29,6 +29,8 @@ function Studio() {
   const [playing, setPlaying] = useState(false)
   const [compare, setCompare] = useState(q.get('compare') === '1')
   const [drawer, setDrawer] = useState(false)
+  // Demo order: the page opens on the rule-of-thumb layout; "Recommend exits" reveals ours (?rec=1 skips ahead)
+  const [revealed, setRevealed] = useState(q.get('rec') === '1' || q.get('compare') === '1')
   const frames = D.frames
   const last = Math.min(frames.chosen.length, frames.rule_of_thumb.length) - 1
 
@@ -86,8 +88,8 @@ function Studio() {
             </div>
           </fieldset>
           <label className="block space-y-2">
-            <span className="flex justify-between text-[12px] uppercase tracking-[0.12em] text-dim">Number of exits <span className="num text-[15px] text-ink">{n}</span></span>
-            <input type="range" min={D.curve[0].n_exits} max={D.curve[D.curve.length - 1].n_exits} value={n}
+            <span className="flex justify-between text-[12px] uppercase tracking-[0.12em] text-dim">Number of exits <span className="num text-[15px] text-ink">{revealed ? n : '–'}</span></span>
+            <input type="range" disabled={!revealed} min={D.curve[0].n_exits} max={D.curve[D.curve.length - 1].n_exits} value={n}
               onChange={e => setN(Number(e.target.value))} className="w-full" aria-label="Number of exits" />
             <span className="flex justify-between text-[13px] text-faint num"><span>{D.curve[0].n_exits}</span><span>code minimum 2</span><span>{D.curve[D.curve.length - 1].n_exits}</span></span>
           </label>
@@ -97,7 +99,7 @@ function Studio() {
         {/* CENTRE: the plan, or the side-by-side evacuation */}
         <section className="flex min-h-0 flex-col bg-bg">
           <div className="flex items-center gap-4 border-b border-line px-5 py-3">
-            <Head n="02" title={compare ? 'Evacuation, panic, fire in progress' : `Layout with ${n} exits`} />
+            <Head n="02" title={compare ? 'Evacuation, panic, fire in progress' : revealed ? `QueuePilot layout, ${n} exits` : `Rule of thumb, ${ruleN} exits evenly spaced`} />
             <div className="ml-auto flex items-center gap-3">
               {compare && <span className="num text-[15px] text-dim">t = <span className="text-ink">{mmss(step * P.dt_s)}</span></span>}
               <button onClick={play} className="rounded-sm bg-qp px-5 py-2 text-[15px] font-semibold text-bg hover:brightness-110">
@@ -118,13 +120,13 @@ function Studio() {
                         <span className={`text-[16px] font-medium ${k === 'chosen' ? 'text-qp' : 'text-ink'}`}>{t}</span>
                         <span className="num text-[15px] text-dim">still inside <span className={left > 0 && step * P.dt_s > limit ? 'text-alert' : 'text-ink'}>{left}</span></span>
                       </div>
-                      <PlanView plan={P} exits={mask} people={f} fireNode={fire} compact />
+                      <PlanView plan={P} exits={mask} people={f} fireNode={fire} compact ours={k === 'chosen'} />
                     </div>
                   )
                 })}
               </div>
             ) : (
-              <div className="min-h-0 flex-1 px-6 py-4"><PlanView plan={P} exits={layout.exits} minCut={D.min_cut} value={value} /></div>
+              <div className="min-h-0 flex-1 px-6 py-4">{revealed ? <PlanView plan={P} exits={layout.exits} minCut={D.min_cut} value={value} /> : <PlanView plan={P} exits={D.rule_of_thumb} ours={false} />}</div>
             )}
           </Guard>
           <div className="flex items-center gap-6 border-t border-line px-5 py-2 text-[13px] text-dim">
@@ -137,7 +139,7 @@ function Studio() {
               </>
             ) : (
               <>
-                <span className="flex items-center gap-2"><i className="inline-block h-3.5 w-3.5 rounded-full bg-qp" />exit in this layout</span>
+                <span className="flex items-center gap-2"><i className={`inline-block h-3.5 w-3.5 rounded-full ${revealed ? 'bg-qp' : 'bg-ink'}`} />exit in this layout</span>
                 <span className="flex items-center gap-2"><i className="inline-block h-3.5 w-3.5 rounded-full border border-dashed border-faint" />possible position (size = value)</span>
                 <span className="flex items-center gap-2"><i className="inline-block h-2 w-4 bg-qp" />door to widen</span>
               </>
@@ -148,6 +150,8 @@ function Studio() {
         {/* RIGHT: the verdict */}
         <section className="row-span-2 flex min-h-0 flex-col gap-4 overflow-hidden bg-panel p-6">
           <Head n="03" title="Verdict" tag={<Tag>simulated</Tag>} />
+          {!revealed ? <Before ruleN={ruleN} ruleS={D.curve.find(c => c.n_exits === ruleN)?.rule_s} limit={limit}
+            screened={recommend?.data.screened} onGo={() => { setRevealed(true); setN(chosenN) }} /> : <>
           <div>
             <div className="text-[13px] uppercase tracking-[0.12em] text-dim">Fewest exits that pass</div>
             <div className="mt-1 flex items-baseline gap-3">
@@ -182,17 +186,18 @@ function Studio() {
               </table>
             </div>
           )}
+          </>}
         </section>
 
         {/* BOTTOM: the curve */}
         <section className="flex min-h-0 flex-col bg-panel px-5 pb-3 pt-4">
           <Head n="04" title="Exits vs worst-case clearance" tag={
             <span className="flex items-center gap-4 text-[13px] text-dim">
-              <span className="flex items-center gap-2"><i className="inline-block h-0.5 w-5 bg-qp" />QueuePilot</span>
+              {revealed && <span className="flex items-center gap-2"><i className="inline-block h-0.5 w-5 bg-qp" />QueuePilot</span>}
               <span className="flex items-center gap-2"><i className="inline-block h-0.5 w-5 bg-dim" />Rule of thumb</span>
               <Tag>simulated</Tag>
             </span>} />
-          <div className="min-h-0 flex-1"><Guard name="Curve"><Curve curve={D.curve} limit={limit} selected={n} onPick={setN} /></Guard></div>
+          <div className="min-h-0 flex-1"><Guard name="Curve"><Curve curve={D.curve} limit={limit} selected={revealed ? n : ruleN} onPick={setN} ours={revealed} /></Guard></div>
         </section>
       </main>
       <ModelDrawer open={drawer} onClose={() => setDrawer(false)} plan={P} results={results?.data ?? null} recommend={recommend?.data ?? null} stub={!!results?.stub} />
@@ -213,7 +218,7 @@ function Gauge({ value, limit, bound }: { value: number; limit: number; bound: n
       <div className="relative mt-3 h-4 bg-raised">
         <div className={`absolute inset-y-0 left-0 ${value > limit ? 'bg-alert' : 'bg-qp'}`} style={{ width: pct(Math.min(value, max)) }} />
         <div className="absolute -inset-y-1.5 w-0.5 bg-alert" style={{ left: pct(limit) }} />
-        <div className="absolute -inset-y-1 w-px bg-ink/70" style={{ left: pct(bound) }} />
+        {bound > 0 && <div className="absolute -inset-y-1 w-px bg-ink/70" style={{ left: pct(bound) }} />}
       </div>
       <div className="relative mt-1 h-4">
         {Array.from({ length: max / 30 + 1 }, (_, i) => i * 30).map(t => (
@@ -222,8 +227,26 @@ function Gauge({ value, limit, bound }: { value: number; limit: number; bound: n
       </div>
       <div className="mt-1 flex gap-4 text-[13px] text-dim">
         <span><i className="mr-1.5 inline-block h-3 w-0.5 bg-alert align-middle" />limit {limit} s</span>
-        <span><i className="mr-1.5 inline-block h-3 w-px bg-ink/70 align-middle" />best possible (max-flow) {bound} s</span>
+        {bound > 0 && <span><i className="mr-1.5 inline-block h-3 w-px bg-ink/70 align-middle" />best possible (max-flow) {bound} s</span>}
       </div>
+    </div>
+  )
+}
+
+// Before the architect presses Recommend: what the rule of thumb gives them.
+function Before({ ruleN, ruleS, limit, screened, onGo }: { ruleN: number; ruleS?: number; limit: number; screened?: number; onGo: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col gap-5">
+      <div>
+        <div className="text-[13px] uppercase tracking-[0.12em] text-dim">Rule of thumb</div>
+        <div className="mt-1 flex items-baseline gap-3">
+          <span className="num text-[60px] font-semibold leading-none">{ruleN}</span><span className="text-[17px] text-dim">exits, evenly spaced</span>
+        </div>
+      </div>
+      {ruleS !== undefined && <Gauge value={ruleS} limit={limit} bound={0} />}
+      <p className="text-[15px] leading-relaxed text-dim">Worst case under panic, with a fire, against a safe limit of {limit} s.</p>
+      <button onClick={onGo} className="mt-auto rounded-sm bg-qp py-4 text-[18px] font-semibold text-bg hover:brightness-110">Recommend exits</button>
+      {screened !== undefined && <p className="text-center text-[13px] text-faint">screens {fmt(screened)} layouts with the PG-GNN, then verifies the top 5</p>}
     </div>
   )
 }
