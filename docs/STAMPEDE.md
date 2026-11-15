@@ -116,3 +116,53 @@ Use the UI/UX Pro Max skill again. Depth through layout and type, not effects: a
 ## E. Order of work for version 2
 Finish parts 1–4 above first if not done. Then: (5) model strip + formulas drawer; (6) plaza two-scale view from plaza_demo.json; (7) PG-CNN training + its results on the page; (8) PG-GNN on venues + forecast line; (9) features C4–C8 + polish. Screenshot after each (docs/brief/live_5_... to live_9_...), push, one MESSAGE, tell the user the link. STOP after (9) for feedback.
 
+---
+
+# VERSION 3 (15 Nov, user feedback: the plaza / PG-CNN part looked cheap and was not understandable; use real physics). This REPLACES everything Version 2 says about the plaza and the PG-CNN (sections A "PG-CNN", B formula 6, C1). The rest of Version 2 stays.
+
+## The idea in one line (put this on the page, exactly this plain)
+**"The venue map tells us WHICH plaza is in trouble. The Crush-Point Finder tells us WHERE in that plaza people will be crushed."**
+Call the feature **Crush-Point Finder**. Never call it "plaza grid" or "plaza layer" on the page.
+
+## What it shows (what the viewer must understand in 5 seconds)
+A top-down picture of the space in front of the gate (40 m × 64 m), like a drone or CCTV view: people come in from the left, the gate is on the right. The crowd is drawn as a heat map. The point: **the site plan says the crush will be at the gate; in reality it also forms earlier, where clutter the plan does not show (barricade stubs, parked vehicles, stalls) squeezes the crowd.**
+
+## The physics (real, published crowd science; engine/plaza.py implements exactly this)
+1. **Continuity equation** (people are conserved): `∂ρ/∂t + ∇·(ρ v) = 0`
+2. **Weidmann's speed law** (1993), measured on real pedestrians: `v(ρ) = v₀ · (1 − exp(−γ · (1/ρ − 1/ρ_max)))`, `v₀ = 1.34 m/s`, `γ = 1.913 m⁻²`, `ρ_max = 5.4 m⁻²`
+3. **Eikonal equation** (Hughes' crowd model, 2002): people take the quickest path, not the shortest: `|∇T| = 1 / v(ρ)`, `T = 0` at the gate. Routes bend around dense patches.
+4. **Crowd pressure** (Helbing et al., 2007), the crush indicator: `P = ρ · Var(v)`
+5. **What the PG-CNN learns**, bounded: `u(x) = σ(CNN(survey image)) ∈ [0, 1]` = share of the floor that is really usable; density is people per m² of usable floor.
+Show these five, typeset properly (KaTeX or well-set HTML), each with one plain line under it. Footer: "Constants from Weidmann 1993; model from Hughes 2002; pressure from Helbing et al. 2007."
+
+## What the real physics is worth (measured on the demo plaza, simulated; read from data/crowd/plaza_demo.json `models`)
+| Model | Density error (people/m²) | Crush cells found (of 77) | False alarms |
+|---|---|---|---|
+| Shortest path, site plan as drawn | 0.535 | 2 | 80 |
+| Crowd physics (Hughes + Weidmann), site plan as drawn | 0.119 | 34 | 28 |
+| PG-CNN (physics + learned usable floor) | from your results file | | |
+The physics alone cuts the error 4.5× and finds 34 crush cells instead of 2. The PG-CNN's job is the remaining 43: they are where the hidden clutter is.
+
+## Data (numpy only, `python -m engine.plaza`, 30 s)
+- `data/crowd/plaza_demo.json`: `height 20, width 32, cell_m 2, frame_s 30, danger_density 4, max_density 5.4, gate[y][x], clutter[y][x] (0..1), usable_share_true[y][x]`, `constants`, `truth {density[40][20][32], pressure[40][20][32], peak_density, peak_pressure, through[40], waiting_outside[40]}`, `models.shortest_path` and `models.hughes` each `{label, density[40][20][32], density_error, crush_cells_true, found, missed, false_alarms}`.
+- `data/crowd/plaza_train.npz` (gitignored) / `plaza_sample.npz` (committed): `density[R,40,20,32]` (every 30 s), `clutter[R,20,32]`, `gate[R,20,32]`, `total[R]`, `is_test[R]` (12 of 60 held out), `usable_share_true` (scoring only).
+
+## PG-CNN (research/live/pgcnn_plaza.py)
+Same pattern as your smoke model: CNN(clutter image) → sigmoid → usable share per cell → the SAME physics step as `engine/plaza.py` (`step`, `weidmann`), trained by rolling forward and backpropagating through it. The quickest-path routing is not differentiable: call `engine.plaza.quickest_paths(speed, gate)` on the detached density every 10 steps and treat the directions as fixed inputs. 1 s steps are slow to backprop through 1,200 of them: train on windows of 120–240 steps from t = 0, and/or use every 2nd step with DT = 2 (keep v·DT/DX ≤ 1). Baselines for the table: the two rows above (already computed) plus "CNN only". Write `research/live/pgcnn_plaza.json` in the same shape as `models.*` (`density`, `density_error`, `found`, `missed`, `false_alarms`) plus `usable_share_learned[y][x]` and held-out-plaza averages. If it is not trained in time, the third row of the table reads "training" with no numbers.
+
+## How it should look (this was the "cheap" part; make it the best-looking thing on the page)
+- Opens as a large panel when the worst zone is clicked (and from the model strip). Title: "Crush-Point Finder". One line under it: the idea sentence above.
+- **Three views of the same plaza side by side, same clock:** "Site plan says" (models.hughes), "PG-CNN says" (your result), "What really happens" (truth). Each is a smooth heat map (interpolate between cells; no visible squares), with the gate drawn as a real opening on the right wall, arrivals as an arrow on the left, and a 10 m scale bar. Crush points (density ≥ 4) get a crisp ring and a small label with the density.
+- **Clutter reveal:** a toggle draws the clutter as hatched shapes ("not on the site plan") and, next to it, the PG-CNN's learned usable-floor map: the two should visibly match.
+- **Pressure view:** a second toggle switches the heat map from density to crowd pressure `P = ρ·Var(v)`.
+- One number row under the views, from the table above: crush points found by each model (2 → 34 → PG-CNN's number, of 77).
+- No raw tables, no axis clutter, no legends longer than one line. It should read like a thermal camera image with engineering annotations.
+
+## Small enhancements to the four use cases (only these; do not add more panels)
+- On each venue tab show one line "What went wrong" from `note` (the hidden problem) and one line "What QueuePilot did" built from the chosen actions.
+- The timeline shows the gap between ALARM and DANGER as a filled band labelled "N minutes of warning".
+- In Side by side, stamp each side at the danger minute: "CRUSH RISK" on the left, "BELOW DANGER LINE" on the right (read from the data).
+
+## Order of work now
+(a) Crush-Point Finder panel from plaza_demo.json with the two computed models + truth (PG-CNN column shows "training"); screenshot docs/brief/live_crush_1.png, push, tell the user the link. (b) Physics drawer with the five equations typeset. (c) Train the PG-CNN, fill the third view and the number row; screenshot live_crush_2.png. (d) The three small use-case enhancements. (e) PG-GNN on venues as in Version 2. STOP after each of (a), (c) and (e) for feedback.
+

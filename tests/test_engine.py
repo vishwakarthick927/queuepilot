@@ -165,6 +165,16 @@ def test_crowd_venue_alarm_comes_before_danger_and_plan_is_safe():
     assert a["with_queuepilot"]["peak_density"] < crowd.DANGER < a["today"]["peak_density"]
 
 
+def test_plaza_conserves_people_and_weidmann_speed_falls_with_density():
+    from engine import plaza
+    assert plaza.weidmann(np.array([0.5])) > plaza.weidmann(np.array([3.0])) > plaza.weidmann(np.array([5.0]))
+    pl = plaza.make_plaza(3)
+    d, _, thr, wait = plaza.run(pl, 1500.0, steps=300)
+    inside = (d[-1] * pl["pass_true"] * plaza.DX ** 2).sum()
+    assert abs(inside + thr[-1] + wait[-1] - 1500.0 * (np.sin(np.linspace(0, np.pi, 210)) ** 2).sum() / (np.sin(np.linspace(0, np.pi, 210)) ** 2).sum()) < 1.0
+    assert d.max() <= plaza.RHO_MAX + 1e-3
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):
