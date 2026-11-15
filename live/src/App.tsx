@@ -4,6 +4,9 @@ import VenueMap from './VenueMap'
 import Timeline from './Timeline'
 import { NowRail, DoRail } from './Rails'
 import HowItWorks from './HowItWorks'
+import Physics from './Physics'
+import ModelStrip from './ModelStrip'
+import PlazaView, { type PlazaSource } from './PlazaView'
 
 // Modes: what no one does (today), the twin + an approved plan (qp), or both at once (side).
 export type Mode = 'today' | 'qp' | 'side'
@@ -32,6 +35,10 @@ export default function App() {
   const [approved, setApproved] = useState(q.get('ok') === '1')
   const [how, setHow] = useState(q.get('how') === '1')
   const closeHow = useCallback(() => setHow(false), [])
+  const [physics, setPhysics] = useState(q.get('physics') === '1')
+  const closePhysics = useCallback(() => setPhysics(false), [])
+  const [plaza, setPlaza] = useState(q.get('plaza') === '1')
+  const [plazaSrc, setPlazaSrc] = useState<PlazaSource>((q.get('src') as PlazaSource) ?? 'real')
 
   const alarmF = frameAt(venue, venue.forecast.alarm_at_min)
   const dangerF = frameAt(venue, venue.today.danger_at_min)
@@ -73,6 +80,8 @@ export default function App() {
       if (e.target instanceof HTMLInputElement) return
       const k = e.key.toLowerCase()
       if (k === 'h') { setHow((h) => !h); return }
+      if (k === 'f') { setPhysics((x) => !x); return }
+      if (k === 'p') { setPlaza((x) => !x); return }
       if (k === ' ') { e.preventDefault(); play() }
       else if (k >= '1' && k <= '4' && VENUES[+k - 1]) pickVenue(VENUES[+k - 1].id)
       else if (k === 't') pickMode('today')
@@ -90,6 +99,15 @@ export default function App() {
 
   const planOn = mode === 'side' || (mode === 'qp' && approved)
   const run = planOn ? venue.with_queuepilot : venue.today
+  // Which stage of the pipeline the demo is in: the models watch before the alarm, the twin names the gate at it,
+  // the plan runs once approved. Today mode runs no models.
+  const tMin = (f * venue.frame_s) / 60
+  const stage = mode === 'today' ? -1 : planOn && f >= alarmF ? 3 : f >= alarmF ? 2 : tMin >= venue.forecast.alarm_at_min / 2 ? 1 : 0
+  const openStage = (s: 'venue' | 'plaza' | 'twin' | 'plan') => {
+    if (s === 'plaza') setPlaza(true)
+    else if (s === 'venue') { setPlaza(false); setPhysics(true) }
+    else { setPlaza(false); if (mode === 'today') setMode('qp'); setF(alarmF); setPlaying(false) }
+  }
   const pane = (withPlan: boolean) => {
     const r = withPlan ? venue.with_queuepilot : venue.today
     const crushed = !withPlan && f >= dangerF
@@ -101,7 +119,8 @@ export default function App() {
           </div>
         )}
         <VenueMap venue={venue} density={densityAt(r, f)} openGates={openGates(venue, withPlan, f)} flowing={playing}
-          learned={(mode === 'qp' || withPlan) && f >= alarmF ? venue.forecast.hidden_problem : undefined} />
+          learned={(mode === 'qp' || withPlan) && f >= alarmF ? venue.forecast.hidden_problem : undefined}
+          onZoom={() => setPlaza(true)} />
         {crushed && (
           <div className="stamp danger">
             <b>DANGER</b>
@@ -130,6 +149,7 @@ export default function App() {
           ))}
         </nav>
         <span className="spacer" />
+        <button className="linkbtn" onClick={() => setPhysics(true)}>The physics <kbd>F</kbd></button>
         <button className="linkbtn" onClick={() => setHow(true)}>How it works <kbd>H</kbd></button>
         <nav className="seg" aria-label="Mode">
           {MODES.map((m) => (
@@ -139,6 +159,7 @@ export default function App() {
           ))}
         </nav>
       </header>
+      <ModelStrip venue={venue} stage={stage} onOpen={openStage} />
       <main className="body">
         <NowRail venue={venue} run={run} f={f} planOn={planOn} twinOn={mode !== 'today'}
           other={mode === 'side' ? venue.today : undefined} />
@@ -153,9 +174,13 @@ export default function App() {
               Peak crowd <b className="num">{fmt1(venue.today.peak_density)}</b> → <b className="num qp">{fmt1(venue.with_queuepilot.peak_density)}</b> people per m².
             </p>
           </div>
-          <div className={mode === 'side' ? 'stage split' : 'stage'}>
-            {mode === 'side' ? <>{pane(false)}{pane(true)}</> : pane(planOn)}
-          </div>
+          {plaza ? (
+            <div className="stage"><PlazaView venue={venue} f={f} source={plazaSrc} onSource={setPlazaSrc} onBack={() => setPlaza(false)} /></div>
+          ) : (
+            <div className={mode === 'side' ? 'stage split' : 'stage'}>
+              {mode === 'side' ? <>{pane(false)}{pane(true)}</> : pane(planOn)}
+            </div>
+          )}
           <Timeline venue={venue} f={f} playing={playing} showQp={mode !== 'today'} approved={planOn}
             onSeek={(x) => { setF(x); setPlaying(false) }} onPlay={play} />
         </section>
@@ -167,6 +192,7 @@ export default function App() {
         <span className="inspired">Inspired by <b>{venue.inspired_by.event}</b>, {venue.inspired_by.date}: {venue.inspired_by.toll}. Layout is schematic, not a reconstruction.</span>
       </footer>
       {how && <HowItWorks venue={venue} onClose={closeHow} />}
+      {physics && <Physics onClose={closePhysics} />}
     </div>
   )
 }

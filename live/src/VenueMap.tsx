@@ -20,6 +20,7 @@ type Props = {
   openGates: Set<number>    // gate ids open now
   flowing: boolean          // draw moving dots along the passages
   learned?: { gate: string; learned_share: number }  // once the twin has found the failing gate, tag it on the map
+  onZoom?: () => void       // click the critical zone to open its plaza grid (the PG-CNN scale)
 }
 
 // Elbow path between two zone centres: across first, then up or down. Reads like a floor plan, not a mind map.
@@ -28,7 +29,8 @@ function elbow(a: Zone, b: Zone) {
   return `M${a.x},${a.y} L${b.x},${a.y} L${b.x},${b.y}`
 }
 
-export default function VenueMap({ venue, density, openGates, flowing, learned }: Props) {
+export default function VenueMap({ venue, density, openGates, flowing, learned, onZoom }: Props) {
+  const zoomId = venue.zones.find((q) => q.name === venue.today.worst_zone)?.id
   const z = venue.zones
   const pad = 34
   const x0 = Math.min(...z.map((q) => q.x - q.w / 2)) - pad
@@ -74,9 +76,17 @@ export default function VenueMap({ venue, density, openGates, flowing, learned }
         }
         const d = density[q.id] ?? 0
         const hot = d >= danger
+        const zoom = onZoom && q.id === zoomId
         return (
-          <g key={q.id} className={hot ? 'zone hot' : 'zone'}>
+          <g key={q.id} className={`zone${hot ? ' hot' : ''}${zoom ? ' zoomable' : ''}`} onClick={zoom ? onZoom : undefined}
+            role={zoom ? 'button' : undefined} aria-label={zoom ? `Open the grid inside ${q.name}` : undefined}>
             <rect x={q.x - q.w / 2} y={q.y - q.h / 2} width={q.w} height={q.h} rx={7} fill={densityColor(d, danger)} />
+            {zoom && (
+              <g className="zoom-tag" transform={`translate(${q.x - q.w / 2 + 7}, ${q.y + q.h / 2 - 16})`}>
+                <rect x={0} y={0} width={30} height={11} rx={2} />
+                <text x={15} y={8} textAnchor="middle">GRID ↗</text>
+              </g>
+            )}
             <text x={q.x - q.w / 2 + 7} y={q.y - q.h / 2 + 13} className={d > danger * 0.62 && !hot ? 'zname on-light' : 'zname'}>
               {q.name}
             </text>
