@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Guard } from '../components/Guard'
-import { design, plan, results, recommend, type Design, type Frames, type Plan, type Score } from './data'
+import { design, plan, results, recommend, smokeDemo, type Design, type Frames, type Plan, type Score } from './data'
 import HowItWorks from './HowItWorks'
 import PlanView, { DENSITY_STOPS, densityColor } from './PlanView'
 import { Key } from './ui'
@@ -14,6 +14,7 @@ const FRAME_MS = 80                                    // one 2-second simulatio
 const STAMP_PAUSE_MS = 1400                            // the clock freezes this long at the time limit
 const ONE_FONT = { '--font-mono': 'var(--font-sans)' } as React.CSSProperties
 type Mode = 'try' | 'found' | 'play'
+type Scene = 'door' | 'smoke'                          // fire blocks the front door  |  smoke fills a corridor
 
 export default function DesignStudio() {
   if (!plan) return <Empty text="No floor plan yet: waiting for data/design/demo_plan.json." />
@@ -42,9 +43,13 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
   const [how, setHow] = useState(q.get('how') === '1')
   const [step, setStep] = useState(Number(q.get('t')) || 0)
   const [playing, setPlaying] = useState(false)
+  const [scene, setScene] = useState<Scene>(q.get('scene') === 'smoke' ? 'smoke' : 'door')
+  const [howAt, setHowAt] = useState<string | undefined>()
   const total = useMemo(() => P.nodes.reduce((a, n) => a + n.people0, 0), [P])
   const limitStep = Math.round(P.safe_limit_s / P.dt_s)
-  const last = Math.max(D.frames.chosen.people.length, D.frames.rule_of_thumb.people.length)
+  const smokeFire = pickSmokeFire(P)                                      // the smoke fire that blocks a corridor first
+  const frames = scene === 'smoke' && smokeFire != null && D.frames_smoke?.[String(smokeFire)] ? D.frames_smoke[String(smokeFire)] : D.frames
+  const last = Math.max(frames.chosen.people.length, frames.rule_of_thumb.people.length)
   const lookup = useMemo(() => new Map(R.layouts.map(l => [l.exits.join(','), l])), [R])
   const verdict = lookup.get([...mine].sort((a, b) => a - b).join(','))
 
@@ -77,7 +82,7 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
   const tags = Object.fromEntries(chosen.exits.filter(x => x !== front).map((x, i) => [x, `${i + 1} Exit here`]))
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr_auto] overflow-hidden bg-bg" style={ONE_FONT}>
+    <div className="grid h-screen grid-rows-[auto_auto_1fr_auto] overflow-hidden bg-bg" style={ONE_FONT}>
       <header className="flex items-end gap-8 border-b border-line px-8 pb-5 pt-6">
         <div>
           <div className="text-[15px] font-semibold uppercase tracking-[0.14em] text-dim">QueuePilot <span className="text-qp">Design</span></div>
@@ -86,11 +91,13 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
         </div>
         <button onClick={() => setHow(true)} className="mb-1 ml-auto shrink-0 rounded-sm border border-line-strong px-4 py-2 text-[15px] text-dim hover:border-ink hover:text-ink">How it works<Key k="H" /></button>
       </header>
+      <Steps active={activeStep(mode, scene, step, smokeFire, P)} onOpen={id => { setHowAt(id); setHow(true) }} />
 
       <main className="grid min-h-0 grid-cols-[1fr_400px]">
         <Guard name="Floor plan">
           {mode === 'play'
-            ? <SideBySide P={P} D={D} step={step} total={total} limitStep={limitStep} />
+            ? <SideBySide P={P} frames={frames} scene={scene} smokeFire={smokeFire} setScene={s => { setScene(s); setStep(0); setPlaying(true) }}
+                step={step} total={total} limitStep={limitStep} />
             : (
               <div className="relative min-h-0 px-8 py-4">
                 <PlanView plan={P} exits={mode === 'found' ? chosen.exits : mine} ours={mode === 'found'}
@@ -102,7 +109,7 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
             )}
         </Guard>
 
-        <aside className="flex min-h-0 flex-col gap-6 border-l border-line bg-panel px-7 py-6">
+        <aside className="flex min-h-0 flex-col gap-4 border-l border-line bg-panel px-7 py-5">
           {mode === 'try' && <TryPanel P={P} verdict={verdict} count={mine.length} onFind={find} />}
           {mode !== 'try' && <Result P={P} R={R} chosen={chosen} />}
           {mode === 'found' && (
@@ -123,7 +130,7 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
         {(results?.stub || recommend?.stub) && <span className="text-alert">stub data</span>}
         <span className="ml-auto">{total} people · panicked crowd · a fire can block any exit</span>
       </footer>
-      <HowItWorks open={how} onClose={() => setHow(false)} plan={P} design={D} results={results?.data ?? null} recommend={recommend?.data ?? null} />
+      <HowItWorks open={how} at={howAt} onClose={() => { setHow(false); setHowAt(undefined) }} plan={P} design={D} results={results?.data ?? null} recommend={recommend?.data ?? null} />
     </div>
   )
 }
@@ -158,7 +165,7 @@ function Result({ P, R, chosen }: { P: Plan; R: Design['by_panic'][string]; chos
         <span className="text-qp">{n} exits placed by QueuePilot</span> get everyone out in {minsec(t)}.
         {rule != null && <span className="text-dim"> Spread evenly, you would need {rule}.</span>}
       </p>
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-2">
         <Big label="Exits needed" value={String(n)} note={rule != null ? `instead of ${rule}` : undefined} />
         <Big label="Time to get everyone out" value={clock(t)} note={`limit ${clock(P.safe_limit_s)}`} />
         {R.area_freed_m2 != null && <Big label="Floor space saved" value={`${R.area_freed_m2} m²`} note="for rooms instead of exit stairs and lobbies" />}
@@ -169,7 +176,7 @@ function Result({ P, R, chosen }: { P: Plan; R: Design['by_panic'][string]; chos
 
 function Big({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="border-t border-line pt-3">
+    <div className="border-t border-line pt-2">
       <div className="text-[15px] text-dim">{label}</div>
       <div className="num mt-1 text-[44px] font-semibold leading-none">{value}</div>
       {note && <div className="mt-1 text-[15px] text-dim">{note}</div>}
@@ -178,28 +185,49 @@ function Big({ label, value, note }: { label: string; value: string; note?: stri
 }
 
 // Step 3: both buildings, same fire, same panicked crowd, same clock. The stamp at the time limit is the pitch.
-function SideBySide({ P, D, step, total, limitStep }: { P: Plan; D: Design; step: number; total: number; limitStep: number }) {
+function SideBySide({ P, frames, scene, smokeFire, setScene, step, total, limitStep }: {
+  P: Plan; frames: { chosen: Frames; rule_of_thumb: Frames }; scene: Scene; smokeFire: number | null; setScene: (s: Scene) => void
+  step: number; total: number; limitStep: number
+}) {
   const t = step * P.dt_s, stamped = step >= limitStep
   const sides = [['rule_of_thumb', 'spread evenly', 'text-ink', false], ['chosen', 'placed by QueuePilot', 'text-qp', true]] as const
+  const sf = scene === 'smoke' && smokeFire != null ? P.smoke_fires?.find(f => f.id === smokeFire) : undefined
+  const sd = sf ? smokeDemo?.data.fires.find(f => f.fire === smokeFire) : undefined
+  const k = Math.max(0, Math.floor((step - 1) / (smokeDemo?.data.frame_every_steps ?? 3)))   // smoke frame k = after step 3k + 1
+  const smoke = sd && step > 0 ? {
+    cells: sd.smoke[Math.min(k, sd.smoke.length - 1)], cell: smokeDemo!.data.cell_m,
+    x0: smokeDemo!.data.origin_tile[0] * 6 - 3, y0: smokeDemo!.data.origin_tile[1] * 6 - 3,
+  } : undefined
+  const closed = sf ? sf.close.filter(c => c.step <= step).map(c => c.edge) : []
+  const room = sf ? P.nodes[sf.start_node]?.name ?? 'a room' : ''
   return (
     <div className="flex min-h-0 flex-col">
-      <div className="flex items-baseline gap-4 border-b border-line px-8 py-3">
+      <div className="flex items-center gap-4 border-b border-line px-8 py-3">
         <span className="num text-[44px] font-semibold leading-none">{clock(t)}</span>
-        <span className="text-[15px] text-dim">time limit {clock(P.safe_limit_s)} · the fire blocks the front door</span>
-        <Bar step={step} limitStep={limitStep} last={Math.max(D.frames.chosen.people.length, D.frames.rule_of_thumb.people.length)} />
+        <span className="text-[15px] text-dim">limit {clock(P.safe_limit_s)} · {sf ? `fire in ${room}, its smoke fills the corridor` : 'the fire blocks the front door'}</span>
+        <Bar step={step} limitStep={limitStep} last={Math.max(frames.chosen.people.length, frames.rule_of_thumb.people.length)} />
+        {smokeFire != null && (
+          <div className="flex gap-px border border-line-strong bg-line-strong text-[15px]">
+            {([['door', 'Front door blocked'], ['smoke', 'Smoke in a corridor']] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setScene(v)} aria-pressed={scene === v}
+                className={`px-3 py-1 ${scene === v ? 'bg-ink font-semibold text-bg' : 'bg-panel text-dim hover:text-ink'}`}>{label}</button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-px bg-line">
-        {sides.map(([k, label, color, ours]) => {
-          const f = D.frames[k], { left, people } = insideAt(f, step, total)
+        {sides.map(([key, label, color, ours]) => {
+          const f = frames[key], { left, people } = insideAt(f, step, total)
           const atLimit = insideAt(f, limitStep, total).left
           return (
-            <div key={k} className="relative flex min-h-0 flex-col bg-bg px-6 pt-4">
+            <div key={key} className="relative flex min-h-0 flex-col bg-bg px-6 pt-4">
               <div className={`text-[22px] font-semibold ${color}`}>{f.exits.length} exits, {label}</div>
               <div className="mt-1 flex items-baseline gap-3">
                 <span className="num text-[44px] font-semibold leading-none">{left}</span><span className="text-[15px] text-dim">people still inside</span>
               </div>
               <div className="min-h-0 flex-1 py-3">
-                <PlanView plan={P} exits={f.exits} blocked={f.lost_exit ?? null} people={people ?? P.nodes.map(n => n.people0)} compact ours={ours} />
+                <PlanView plan={P} exits={f.exits} blocked={f.lost_exit ?? null} people={people ?? P.nodes.map(n => n.people0)} compact ours={ours}
+                  smoke={smoke} closed={closed} fireNode={sf?.start_node ?? null} />
               </div>
               {stamped && (
                 <div className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -rotate-6 border-4 bg-bg/85 px-4 py-2 text-[22px] font-semibold uppercase tracking-wide ${atLimit > 0 ? 'border-alert text-alert' : 'border-qp text-qp'}`}>
@@ -214,8 +242,41 @@ function SideBySide({ P, D, step, total, limitStep }: { P: Plan; D: Design; step
         <span>crowding</span>
         {DENSITY_STOPS.map(d => <i key={d} className="inline-block h-3 w-5" style={{ background: densityColor(d) }} />)}
         <span>empty to packed</span>
+        {sf && <><i className="ml-6 inline-block h-3 w-5 bg-[#c7ccd4]/70" /><span>smoke</span><i className="ml-4 inline-block h-1 w-5 bg-alert" /><span>corridor blocked by smoke</span></>}
       </div>
     </div>
+  )
+}
+
+// The smoke fire whose smoke blocks a corridor first (the clearest one to show).
+function pickSmokeFire(P: Plan) {
+  const f = (P.smoke_fires ?? []).filter(x => x.close.length).sort((a, b) => a.close[0].step - b.close[0].step)[0]
+  return f && design?.data.frames_smoke?.[String(f.id)] && smokeDemo ? f.id : null
+}
+
+// Which of the three steps is lit: smoke spreading -> people moving -> the verdict on the exits.
+function activeStep(mode: Mode, scene: Scene, step: number, smokeFire: number | null, P: Plan) {
+  if (mode !== 'play') return 3
+  const firstBlock = scene === 'smoke' ? P.smoke_fires?.find(f => f.id === smokeFire)?.close[0]?.step : undefined
+  if (step >= Math.round(P.safe_limit_s / P.dt_s)) return 3
+  return firstBlock != null && step < firstBlock ? 1 : 2
+}
+
+// One slim strip: the two models and what they decide, in plain words. Each opens its block in "How it works".
+function Steps({ active, onOpen }: { active: number; onOpen: (id: string) => void }) {
+  const steps = [['smoke', 'Where the smoke goes', 'PG-CNN'], ['people', 'Where the people go', 'PG-GNN'], ['exits', 'Where the exits go', 'QueuePilot']] as const
+  return (
+    <nav className="flex items-center gap-2 border-b border-line bg-panel px-8 py-2" aria-label="How QueuePilot decides">
+      {steps.map(([id, text, model], i) => (
+        <div key={id} className="flex items-center gap-2">
+          {i > 0 && <span className="text-[15px] text-faint">→</span>}
+          <button onClick={() => onOpen(id)} aria-current={active === i + 1 ? 'step' : undefined}
+            className={`flex items-baseline gap-2 rounded-sm px-3 py-1 text-[15px] transition-colors ${active === i + 1 ? 'bg-raised text-ink' : 'text-faint hover:text-dim'}`}>
+            <span className="num font-semibold">{i + 1}</span>{text}<span className={active === i + 1 ? 'text-qp' : ''}>· {model}</span>
+          </button>
+        </div>
+      ))}
+    </nav>
   )
 }
 

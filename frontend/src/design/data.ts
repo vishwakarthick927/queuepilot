@@ -10,6 +10,7 @@ export type Plan = {
   id: string; name: string; safe_limit_s: number; dt_s: number; max_density: number; flow_per_m_s: number
   walk_speed_m_s: number; max_travel_m: number
   nodes: PlanNode[]; edges: PlanEdge[]; candidates: Candidate[]; main_entrance: number; fires: Fire[]
+  smoke_fires?: Fire[]                 // fires whose blocked corridors come from the smoke model (engine/smoke.py)
 }
 
 // One scored layout (engine.design.score). worst_case_s null = somebody never got out.
@@ -27,6 +28,7 @@ export type Design = {
   cost_of_panic: { calm_s: number | null; panic_s: number | null }
   frames: { chosen: Frames; rule_of_thumb: Frames }
   frames_scenario?: string; frames_fire?: number | null; m2_per_exit?: number
+  frames_smoke?: Record<string, { chosen: Frames; rule_of_thumb: Frames }>
   across_plans?: { n_plans: number; solved_both: number; mean_exits_ours: number | null; mean_exits_rule: number | null; plans_where_ours_needs_fewer: number; plans_where_rule_never_passes: number }
 }
 export type ModelScore = { clearance_err_s: number; ci95: number; people_error: number; runs?: number }
@@ -50,8 +52,9 @@ export type Recommend = {
 type Loaded<T> = { data: T; stub: boolean }
 
 // Vite bundles whichever of these files exist at build time.
-const real = import.meta.glob(['../../../data/design/demo_plan.json', '../../../data/design/design.json',
-  '../../../research/design/results.json', '../../../research/design/recommend.json'], { eager: true, import: 'default' })
+const real = import.meta.glob(['../../../data/design/demo_plan.json', '../../../data/design/design.json', '../../../data/design/smoke_demo.json',
+  '../../../research/design/results.json', '../../../research/design/recommend.json',
+  '../../../research/design/pgcnn_results.json', '../../../research/design/pgcnn_demo.json'], { eager: true, import: 'default' })
 const stub = import.meta.glob('./stub/*.json', { eager: true, import: 'default' })
 
 function pick<T>(name: string): Loaded<T> | null {
@@ -65,6 +68,15 @@ export const plan = pick<Plan>('demo_plan.json')
 export const design = pick<Design>('design.json')
 export const results = pick<Results>('results.json')
 export const recommend = pick<Recommend>('recommend.json')
+
+// Smoke (the PG-CNN's side). smoke_demo.json = MAIN's simulator; pgcnn_demo.json = what our PG-CNN predicts.
+export type SmokeFire = { fire: number; start_node: number; close: { edge: number; step: number }[]; close_textbook?: { edge: number; step: number }[]; smoke: number[][][] }
+export type SmokeDemo = { cell_m: number; sub: number; frame_every_steps: number; block_level: number; origin_tile: [number, number]; fires: SmokeFire[] }
+export type CnnScore = { smoke_error: number; smoke_created: number; block_time_err_s: number; block_time_ci95: number; passages?: number; fires?: number }
+export type CnnResults = { models: { physics: CnnScore; cnn: CnnScore; pgcnn: CnnScore }; vent_error?: { textbook: number; pgcnn: number }; setup?: { test_fires?: number } }
+export const smokeDemo = pick<SmokeDemo>('smoke_demo.json')
+export const cnnResults = pick<CnnResults>('pgcnn_results.json')
+export const cnnDemo = pick<{ fires: SmokeFire[] }>('pgcnn_demo.json')
 
 // Exits are labelled by their name in the plan ("Exit A" -> "A"), the same names MAIN's files use.
 export const exitLabel = (id: number) => {

@@ -22,6 +22,7 @@ type Props = {
   ours?: boolean                       // green = QueuePilot's exits; white = any other layout
   onPick?: (id: number) => void        // click an exit position to place / remove an exit
   tags?: Record<number, string>        // short label next to a built exit, e.g. "1  Exit here"
+  smoke?: { cells: number[][]; x0: number; y0: number; cell: number }   // smoke level per 2 m cell, drawn over the plan
 }
 
 // One sequential scale for density, single hue (amber), dark = empty to light = crowded, same everywhere.
@@ -32,7 +33,7 @@ export function densityColor(d: number) {
   return `rgb(${lo.map((v, i) => Math.round(v + (hi[i] - v) * Math.sqrt(t))).join(',')})`
 }
 
-export default function PlanView({ plan, exits, blocked = null, people, fireNode, closed = [], minCut = [], value = {}, compact, ours = true, onPick, tags = {} }: Props) {
+export default function PlanView({ plan, exits, blocked = null, people, fireNode, closed = [], minCut = [], value = {}, compact, ours = true, onPick, tags = {}, smoke }: Props) {
   const hatch = useId()
   const N = plan.nodes
   const xs = N.map(n => n.x), ys = N.map(n => n.y)
@@ -105,12 +106,28 @@ export default function PlanView({ plan, exits, blocked = null, people, fireNode
           fill={cut ? 'var(--color-qp)' : 'var(--color-bg)'} stroke={cut ? 'var(--color-qp)' : 'var(--color-dim)'} strokeWidth="0.1" />
       })}
 
+      {/* smoke: one grey square per 2 m cell, more opaque where it is thicker (0.6 = too thick to walk through) */}
+      {smoke && smoke.cells.map((row, r) => row.map((v, c) => v > 0.04 && (
+        <rect key={`s${r}-${c}`} x={smoke.x0 + c * smoke.cell} y={smoke.y0 + r * smoke.cell} width={smoke.cell} height={smoke.cell}
+          fill="#c7ccd4" fillOpacity={Math.min(0.85, v * 1.1)} />
+      )))}
+
       {/* the bottleneck passage (min-cut) on corridors, outlined */}
       {minCut.map(i => {
         const e = plan.edges[i]
         if (!e || N[e.a].kind !== 'corridor' || N[e.b].kind !== 'corridor') return null
         const a = N[e.a], b = N[e.b]
         return <line key={'cut' + i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--color-qp)" strokeWidth={0.25} strokeDasharray="0.6 0.4" />
+      })}
+
+      {/* corridors blocked by smoke at this moment */}
+      {closed.map(i => {
+        const e = plan.edges[i]
+        if (!e) return null
+        const mx = (N[e.a].x + N[e.b].x) / 2, my = (N[e.a].y + N[e.b].y) / 2, v = Math.abs(N[e.a].x - N[e.b].x) < 0.1
+        return <g key={'blk' + i} stroke="var(--color-alert)" strokeWidth={0.6} strokeLinecap="round">
+          <line x1={mx - (v ? 2 : 0)} y1={my - (v ? 0 : 2)} x2={mx + (v ? 2 : 0)} y2={my + (v ? 0 : 2)} />
+        </g>
       })}
 
       {/* candidate exits: ring = possible position, filled = built in this layout; size = value score */}
