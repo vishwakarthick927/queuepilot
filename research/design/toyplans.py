@@ -38,7 +38,7 @@ def make_plan(seed, n_seg=6, name=None):
                 continue                                    # an empty plot on this side
             area = r.uniform(60, 160) if not (k == 1 and side == 1) else 420.0   # one big hall
             depth = area / seg_len
-            people = area * r.uniform(0.3, 0.9) if area < 400 else area * 1.0
+            people = area * r.uniform(0.15, 0.5) if area < 400 else area * 0.8
             rm = node("room", 6 + seg_len * k, side * (cor_w / 2 + depth / 2), area, people, seg_len, depth,
                       "Hall" if area >= 400 else f"Room {len(rooms) + 1}")
             edges.append({"a": rm, "b": c, "width_m": 1.8 if area > 400 else round(float(r.choice([0.9, 1.2, 1.5])), 1),
@@ -59,8 +59,10 @@ def make_plan(seed, n_seg=6, name=None):
             cand(rm, n["x"], n["y"] + side * (depth / 2 + 2), round(float(r.uniform(0.05, 0.3)), 2), 1.2)
     fires = []
     for f, start in enumerate(r.choice([rm for rm, _, _ in rooms], size=min(3, len(rooms)), replace=False)):
-        near = [i for i, e in enumerate(edges) if start in (e["a"], e["b"])]
-        fires.append({"id": f"F{f + 1}", "start_node": int(start), "close": [{"edge": i, "step": 15} for i in near]})
+        # smoke fills the corridor link next to the burning room after 30 s: that route is gone
+        cor = next(e["b"] for e in edges if e["a"] == start)
+        link = [i for i, e in enumerate(edges) if nodes[e["a"]]["kind"] == "corridor" == nodes[e["b"]]["kind"] and cor in (e["a"], e["b"])]
+        fires.append({"id": f"F{f + 1}", "start_node": int(start), "close": [{"edge": link[-1], "step": 15}]})
     return {"id": f"toy-{seed}", "name": name or f"Toy plan {seed}", "safe_limit_s": 240, "dt_s": 2,
             "max_density": 4.0, "flow_per_m_s": 1.3, "nodes": nodes, "edges": edges,
             "candidates": cands, "main_entrance": "E1", "fires": fires}

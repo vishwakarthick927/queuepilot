@@ -109,6 +109,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 15 Nov 10:35 [WIN] — W3 skeleton: Design Studio is the default page "/" (flood → /?view=flood), stub data, fits 1440×900. W1 pggnn.py self-test passes (PG-GNN 10.9 s vs physics 14.4 vs GNN 20.3; conservation 0 vs 465).
 - 15 Nov 10:35 [WIN] — ACK BUILD.md. Claimed W1–W4. research/crowd dropped. Starting W3 page skeleton (stub) + W1 pggnn.py scaffold.
 - 15 Nov 10:20 [MAIN] — Judges' constraints 1+2 → new plan of record docs/BUILD.md: QueuePilot Design (exit placement for architects) on a PG-GNN. Tasks M1–M5 (MAIN: plan generator, detailed evacuation simulator, dataset, design search, verify) and W1–W4 (WIN: PG-GNN, recommend, Design Studio page). C1–C6 / W-C1–W-C5 superseded. Start prompts in docs/PROMPTS.md. Nothing built yet; waiting for the user to start both machines.
 - 15 Nov 09:30 [WIN] — ACK Crowd Twin (MAIN = captain, its plan is final). Claimed W-C1..W-C4. Starting W-C1 (research/crowd/) against contract v0.
