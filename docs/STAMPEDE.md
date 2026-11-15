@@ -67,3 +67,52 @@ Use the UI/UX Pro Max skill. No purple or violet. No Inter font (pick a distinct
 3. Left rail (pressure index, countdown) + right rail (action cards, Approve plan, Broadcast) + result sentence. Screenshot live_3_control.png.
 4. Polish pass + "How it works" drawer. Screenshot live_4_final.png. STOP for feedback.
 After each part: commit `[WIN]`, push, one line in docs/BRIDGE.md MESSAGES. If your context is cleared, re-read this file and BRIDGE.md and continue from the last screenshot.
+
+---
+
+# VERSION 2 (15 Nov, user feedback: richer UI, more features, show the formulas, use BOTH PG-GNN and PG-CNN)
+Keep everything above. This section adds to it. Where it conflicts with the "How it works" note above about neural networks, THIS section wins.
+
+## A. The two deep models in QueuePilot Live (judges' constraint: PG-GNN and PG-CNN, both visible)
+The crowd is modelled at two scales, one model each. Both follow the paper's residual idea: physics hard-coded, a bounded learned term.
+
+**PG-GNN: the VENUE scale (graph).** Zones are nodes, passages and gates are edges. Predicts how many people are in every zone over time.
+- Reuse research/design/pggnn.py (destination channels, demand-ratio efficiency, training from t = 0). Two additions to its physics step: (1) `arrivals[t, node]` people are added to a node at each step and choose a gate like everyone else; (2) each gate edge's capacity is multiplied by `gate_eff` (a visible input: in deployment it is the number the twin fits from the gate counters).
+- Data: `python -m engine.crowd_data` → `data/crowd/venue_train.npz` + `venue_plans.json` (160 runs, 4 venues, dt 5 s, 480 steps; arrays listed at the top of engine/crowd_data.py). **The riverbank venue is held out entirely** (`is_test`): it is the unseen-venue test.
+- Report in `research/live/pggnn_venue.json`: on the held-out venue, error in the worst zone's peak density and in the minute danger starts, for physics only / GNN only / PG-GNN; people created or lost. Honest numbers, whatever they are. Also export the PG-GNN's predicted `worst[frame]` for the four demo venues so the page can draw "PG-GNN forecast" as a dashed line next to the truth.
+
+**PG-CNN: the PLAZA scale (grid).** Inside the critical plaza the crowd is a 2 m grid, like a camera density map. Predicts WHERE in the plaza people pile up.
+- Physics: `engine/plaza.py` `step()`: people are conserved; each cell sends a share (0.6) of its people to the neighbour closest to the gate; a cell takes in only `passability × 24 − people`; gate cells release 6.5 people per step. Hidden truth: clutter the site plan does not show lowers passability (`true_pass`). Textbook assumes passability 1.
+- Your PG-CNN = the smoke pattern again: CNN(clutter image, distance-to-gate image) → sigmoid = passability per cell, same physics step, trained through the rollout; baselines physics (passability 1) and CNN only.
+- Data: `python -m engine.plaza` → `data/crowd/plaza_train.npz` (60 plazas, 12 held out; `people[R,120,20,32]` every 10 s, `clutter`, `dist`, `nxt` (0 right, 1 up, 2 down, 3 gate), `gate`, `pass_true` for scoring only), `plaza_sample.npz` (committed), `plaza_demo.json` (for the page: `truth.density[frame][y][x]` and `textbook.density`, people per m² of usable floor, every 30 s; `clutter`; `gate`; `danger_cells_textbook_misses`).
+- Report in `research/live/pgcnn_plaza.json`: held-out plazas, density error physics / CNN only / PG-CNN, people created (0 for ours), danger cells found vs missed, learned vs true passability. Export your predicted density frames for the demo plaza.
+
+If one model is not trained in time: ship the page with the other, and show the missing one's block as "training" with no numbers. Never show invented numbers.
+
+## B. The formulas (a "Physics" drawer on the page; each with one plain line)
+1. Conservation of people (continuity), venue graph: `dN_i/dt = Σ_j f_ji − Σ_j f_ij`
+2. Flow through a passage (cell-transmission form): `f_ij = min( N_i · s_ij · v(ρ_i)·Δt / L_ij ,  w_ij · q_max · Δt · η_ij ,  A_j · ρ_max − N_j )`
+3. Walking speed falls with crowding: `v(ρ) = v0 · max(0.15, 1 − ρ/ρ_max)`, `ρ = N / A`
+4. Learned, bounded terms (PG-GNN): `η_ij = σ(·) ∈ [0, 1]` door efficiency, `s_ij = softmax(·)` gate choice (shares sum to 1, so nobody is created or lost)
+5. Gate calibration from counts (the twin, every 30 s): `η̂ = argmin_η | Σ_t f_gate^model(η) − Σ_t f_gate^counted |`
+6. Plaza grid (PG-CNN): `p_c(t+1) = p_c + Σ in − Σ out`, `in ≤ π_c · C − p_c`, `π_c = σ(CNN(clutter)) ∈ [0, 1]`
+7. Danger: `ρ ≥ 4 people/m²`. Crowd Pressure Index: `CPI = 100 · ρ / ρ_max`
+8. Decision: `a* = argmin over action sets of max_{zones, t} ρ`
+Constants: Δt = 5 s, q_max = 1.3 people/s per metre, v0 = 1.3 m/s, ρ_max = 6 /m². They are parameters; one footer line says so. Paper: Yu & Wang, PNAS 2024, §3A (residual / hybrid models).
+
+## C. More features (add in this order; each is small and visual)
+1. **Two-scale view.** Click the worst zone on the venue map → it opens the plaza grid (20×32 cells) as a density heatmap with the clutter outlined and the gate marked. Toggle: "What the site plan predicts" vs "What really happens" vs "PG-CNN". The cells the textbook misses are outlined (`danger_cells_textbook_misses`).
+2. **Model strip** under the top bar: "PG-GNN · the venue" → "PG-CNN · the plaza" → "Twin · the gates" → "Plan". The active stage lights up as the demo plays.
+3. **Forecast line.** On the timeline, a small chart of the worst zone's density: truth (solid), PG-GNN forecast (dashed), danger line, alarm marker.
+4. **What-if.** Hovering an action card previews its effect (the zone bar drops to `alone_peak_density`); the chosen set is the default.
+5. **Arrival meter.** One slim bar: people arrived / people through the gates / people still outside, from `people` and `through`.
+6. **Field alert preview.** A phone-shaped card showing the message a gate officer receives at the alarm ("Open Gate 7. Send people from Gate 3 to Gates 5 and 7.") with an Acknowledge button that stamps the time into the log.
+7. **Incident log.** A slim list built from data as the demo plays: alarm raised, gate problem found (planned 100% → learned N%), plan approved, announcement made, peak avoided. Export as text.
+8. **Why now.** A one-line strip of the four real incidents (name, date, toll from `inspired_by`), always marked "inspired by".
+
+## D. Richer look (user asked for more attractive, still no slop)
+Use the UI/UX Pro Max skill again. Depth through layout and type, not effects: a strong grid, generous map, crisp 1 px rules, a large numeric display face for the countdown and index, a mono for small data, a restrained accent, one alarm colour. Motion with purpose: density fills ease between frames, the alarm marker pulses once, action cards slide in at the alarm. The map can use subtle hatch or texture for sources and gates so it reads as a real site drawing. Still: no purple, no Inter, no gradients, glow, glass, emoji or stock icons. One screen at 1440×900.
+
+## E. Order of work for version 2
+Finish parts 1–4 above first if not done. Then: (5) model strip + formulas drawer; (6) plaza two-scale view from plaza_demo.json; (7) PG-CNN training + its results on the page; (8) PG-GNN on venues + forecast line; (9) features C4–C8 + polish. Screenshot after each (docs/brief/live_5_... to live_9_...), push, one MESSAGE, tell the user the link. STOP after (9) for feedback.
+

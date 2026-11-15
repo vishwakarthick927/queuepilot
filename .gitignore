@@ -15,3 +15,5 @@ research/flood/*.npy
 data/design/train.npz
 data/design/train_plans.json
 data/design/smoke_train.npz
+data/crowd/plaza_train.npz
+data/crowd/venue_train.npz
