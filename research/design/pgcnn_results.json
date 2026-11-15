@@ -1,0 +1,41 @@
+{
+ "models": {
+  "physics": {
+   "smoke_error": 0.0456,
+   "smoke_created": 0.0,
+   "block_time_err_s": 67.1,
+   "block_time_ci95": 3.7,
+   "passages": 69,
+   "fires": 36
+  },
+  "cnn": {
+   "smoke_error": 0.028,
+   "smoke_created": 0.075,
+   "block_time_err_s": 9.8,
+   "block_time_ci95": 1.7,
+   "passages": 77,
+   "fires": 36
+  },
+  "pgcnn": {
+   "smoke_error": 0.0018,
+   "smoke_created": 0.0,
+   "block_time_err_s": 0.6,
+   "block_time_ci95": 0.2,
+   "passages": 69,
+   "fires": 36
+  }
+ },
+ "vent_error": {
+  "textbook": 0.0269,
+  "pgcnn": 0.0057
+ },
+ "setup": {
+  "source": "MAIN engine.smoke (data/design/smoke_train.npz)",
+  "train_fires": 144,
+  "test_fires": 36,
+  "unseen": "12 floor plans never seen in training",
+  "steps": 75,
+  "dt_s": 2,
+  "simulated": true
+ }
+}
