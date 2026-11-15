@@ -44,4 +44,6 @@
 | W-C3 | frontend/src/crowd/: control-room page per CROWD.md layout, new default route (flood → /?view=flood) | WIN | Claimed 15 Nov 09:30 |
 | W-C4 | Broadcast (speech, 3 languages, recorded fallback) + incident log view | WIN | Claimed 15 Nov 09:30 |
 | V1 | docs/FACTS.md: verify every fact in CROWD.md "Why it matters" with source links | Member 3 | Todo |
+| C5 | CONSTRAINT 1 (docs/CONSTRAINTS.md): exit-design optimiser in engine/crowd.py. Input: floor graph + candidate exit positions + fire scenarios. Output: fewest exits whose clearance time ≤ safe limit in every scenario incl. loss of any one exit; min-cut says "widen this door" vs "add an exit". Export data/crowd/design.json | MAIN | Todo (waiting for user go) |
+| W-C5 | CONSTRAINT 1 view: "Design" tab: floor plan, candidate exits, slider "number of exits" vs clearance time curve, chosen layout vs rule-of-thumb layout, space freed | WIN (proposed) | Todo |
 
