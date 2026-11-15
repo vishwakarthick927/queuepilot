@@ -36,7 +36,7 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
   const [playing, setPlaying] = useState(false)
   const [compare, setCompare] = useState(q.get('compare') === '1')
   const [revealed, setRevealed] = useState(q.get('rec') === '1' || compare)
-  const [drawer, setDrawer] = useState(false)
+  const [drawer, setDrawer] = useState(q.get('model') === '1')     // ?model=1 opens the model drawer
   const F = D.frames
   const last = Math.max(F.chosen.people.length, F.rule_of_thumb.people.length) - 1
 
