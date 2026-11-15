@@ -77,6 +77,7 @@ REAL RESULTS (data/anonymous_bank_results.json, 183 train → 123 test days, 3,9
 | frontend/ | Windows machine (teammate) | React dashboard |
 | docs/CONSTRAINTS.md | Teammate 3 / anyone | Log every constraint verbatim |
 | data/ | WIN downloads, MAIN analyses | Real datasets, see data/README.md. data/design/ = MAIN-owned plan graphs + design.json |
+| apps/ | Main machine | Self-contained static demo pages (Golden Hour, Concrete), built by apps/build.py |
 | research/ | Windows machine | PyTorch models (R1, flood, golden, design/ PG-GNN). research/design may call engine.design_data / engine.evac (read-only use). |
 | docs/BRIDGE.md, docs/TASKS.md | Shared | Append only; protocol in BRIDGE.md |
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
@@ -111,6 +112,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 15 Nov 18:20 [MAIN] — Two backup demos built by MAIN: engine/golden.py (ambulance routing: nearest vs soonest treatment; 30 nights, late patients 54.4 → 10.2; learned rates no better than plan rates, said on the page) and engine/concrete.py (ready-mix: fixed dispatch vs plant paced by learned pump rate; 30 °C, rejected loads 8.3 → 0.5 of 40; re-ordering alone 8.0). Static pages apps/golden, apps/concrete via `python apps/build.py`; serve with `python -m http.server 5175 --directory apps/golden` / `5176 ... apps/concrete`. All simulated.
 - 15 Nov 17:15 [MAIN] — Crush-Point Finder (PG-CNN's job) rebuilt on published crowd physics: engine/plaza.py = continuity + Weidmann speed law + Hughes eikonal routing + Helbing crowd pressure. Demo plaza, simulated: shortest path 0.535 density error, 2/77 crush cells; Hughes+Weidmann 0.119, 34/77. plaza_demo.json / npz shapes changed (see BRIDGE 17:15). Spec: docs/STAMPEDE.md "VERSION 3".
 - 15 Nov 16:45 [MAIN] — QueuePilot Live v2 data + spec: engine/plaza.py (plaza grid for the PG-CNN: hidden clutter, plaza_demo.json, plaza_train/sample.npz), engine/crowd_data.py (160 venue runs with arrivals for the PG-GNN, riverbank held out), docs/STAMPEDE.md "VERSION 2" (two models, 8 formulas, 8 more features, richer look, steps 5–9).
 - 15 Nov 14:07 [WIN] — QueuePilot Live built (docs/STAMPEDE.md parts 1-4): live/ on :5174 reading data/crowd only; map, playback with ALARM/DANGER markers + 'N minutes of warning', Today / With QueuePilot / Side by side, pressure gauge + countdown, action cards, Approve plan, Broadcast (en + hi), How it works drawer + incident log. Screenshots docs/brief/live_*.png. Waiting for user feedback.

@@ -1,0 +1,29 @@
+<div class="app">
+<header>
+  <div><div class="brand">QueuePilot <b>Golden Hour</b></div>
+    <h1>The nearest hospital is not always <em>the fastest one.</em></h1>
+    <div class="sub">After a mass-casualty event, QueuePilot sends each ambulance where treatment starts soonest.</div></div>
+  <div class="ctl"><div class="tabs" id="mode"><button data-m="nearest">Today</button><button data-m="learned">QueuePilot</button><button data-m="both" class="on">Side by side</button></div></div>
+</header>
+<main>
+  <section class="stage">
+    <div class="views two" id="views"></div>
+    <div class="time"><button id="play">Play</button><div class="clock num" id="clock">0:00</div><input type="range" id="scrub" min="0" max="239" value="0"><span class="sub" id="phase"></span></div>
+  </section>
+  <aside>
+    <div class="say" id="say"></div>
+    <div class="kpi"><label>Patients treated after the golden hour, per night</label><div class="row"><span class="a num" id="k1a"></span><span class="b num" id="k1b"></span></div><small id="k1s"></small></div>
+    <div class="kpi"><label>Average time from call to treatment</label><div class="row"><span class="a num" id="k2a"></span><span class="b num" id="k2b"></span></div><small>minutes</small></div>
+    <div class="kpi"><label>Longest wait of the night</label><div class="row"><span class="a num" id="k3a"></span><span class="b num" id="k3b"></span></div><small>minutes</small></div>
+    <details><summary>The physics and what is learned</summary>
+      <div class="eq"><code>t_drive = distance / speed</code><span>Drive time through city traffic.</span></div>
+      <div class="eq"><code>dn/dt = arrivals − c · μ</code><span>Patients in an emergency room: c doctors, each treating μ per minute (an M/M/c queue).</span></div>
+      <div class="eq"><code>W_h = max(0, n_h − c_h + 1) / (c_h · μ_h)</code><span>Expected wait at hospital h, counting ambulances already on the way.</span></div>
+      <div class="eq"><code>h* = argmin_h ( t_drive + W_h )</code><span>Go where treatment starts soonest.</span></div>
+      <div class="eq"><code>μ̂_h = 1 / mean(last 12 treatment times at h)</code><span>Learned tonight: each hospital's real speed. One hospital is short-staffed and slower than its plan.</span></div>
+      <div class="eq" id="honest"></div>
+    </details>
+  </aside>
+</main>
+<footer><span>Simulated city and calls. Speeds, treatment times and the event size are stated assumptions.</span><span id="foot"></span></footer>
+</div>

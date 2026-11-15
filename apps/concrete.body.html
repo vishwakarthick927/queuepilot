@@ -1,0 +1,29 @@
+<div class="app">
+<header>
+  <div><div class="brand">QueuePilot <b>Concrete</b></div>
+    <h1>Concrete does not wait. <em>The queue has to.</em></h1>
+    <div class="sub">QueuePilot paces the batching plant by the pump's real speed, so no truck goes hard in the queue.</div></div>
+  <div class="ctl"><div class="tabs" id="temp"></div><div class="tabs" id="mode"><button data-m="today">Today</button><button data-m="queuepilot">QueuePilot</button><button data-m="both" class="on">Side by side</button></div></div>
+</header>
+<main>
+  <section class="stage">
+    <div class="views" id="views" style="grid-template-rows:1fr 1fr"></div>
+    <div class="time"><button id="play">Play</button><div class="clock num" id="clock">0:00</div><input type="range" id="scrub" min="0" max="600" value="0"><span class="sub" id="phase"></span></div>
+  </section>
+  <aside>
+    <div class="say" id="say"></div>
+    <div class="kpi"><label>Truckloads rejected per pour (of 40)</label><div class="row"><span class="a num" id="k1a"></span><span class="b num" id="k1b"></span></div><small id="k1s"></small></div>
+    <div class="kpi"><label>Concrete wasted per pour</label><div class="row"><span class="a num" id="k2a"></span><span class="b num" id="k2b"></span></div><small>rupees</small></div>
+    <div class="kpi"><label>Time limit at this temperature</label><div class="row"><span class="b num" id="k3b" style="color:var(--ink)"></span></div><small id="k3s"></small></div>
+    <details><summary>The physics and what is learned</summary>
+      <div class="eq"><code>limit(T) = 90 min · 2^(−(T − 30) / 10)</code><span>The 90-minute rule, with setting about twice as fast for every +10 °C.</span></div>
+      <div class="eq"><code>slack = limit(T) − (now − batch time)</code><span>Minutes of life left in each truck. The bar on every truck.</span></div>
+      <div class="eq"><code>dn/dt = trucks arriving − trucks pumped</code><span>The queue at the site obeys conservation.</span></div>
+      <div class="eq"><code>next = argmin slack  (among loads that can still be saved)</code><span>Least slack first at the pump.</span></div>
+      <div class="eq"><code>μ̂ = 1 / mean(last 6 unload times)</code><span>Learned on site: the pump's real speed. Send the next truck only if it will still have slack when its turn comes.</span></div>
+      <div class="eq" id="honest"></div>
+    </details>
+  </aside>
+</main>
+<footer><span>Simulated pour. Prices, travel times and pump rates are stated assumptions.</span><span id="foot"></span></footer>
+</div>
