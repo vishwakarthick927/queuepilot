@@ -34,6 +34,8 @@ export type Results = {
   models: { physics: ModelScore; gnn: ModelScore; pggnn: ModelScore }
   speed: { pggnn_per_s: number; simulator_per_s: number }
   setup?: { test_runs?: number; unseen?: string }
+  // one row per fix of the PG-GNN (MAIN's review), same test: what each fix changed
+  ablation?: { label: string; clearance_err_s: number; ci95: number }[]
 }
 export type Recommend = {
   agreement?: { top1: number; top5: number; exit_counts?: number[] }

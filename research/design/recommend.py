@@ -13,7 +13,7 @@ a layout that does not have it yet.
 Agreement = does the screen pick the simulator's best layout (top 1), or have it in its top 5?
 Checked against the truth ranking MAIN wrote in data/design/design.json, for PG-GNN and physics only.
 
-    python -m research.design.recommend          # writes research/design/recommend.json
+    python -m research.design.recommend [tag]    # tag = which trained model (results_<tag>.json); writes recommend.json
 """
 import json
 import time
@@ -79,11 +79,21 @@ def candidate_value(plan, layouts, worst):
     return out
 
 
+def load_model(tag):
+    """The trained PG-GNN, built with the same switches it was trained with (results<tag>.json setup)."""
+    t = f"_{tag}" if tag else ""
+    setup = json.loads((OUT / f"results{t}.json").read_text())["setup"]
+    model = PGGNN(channels=setup.get("channels", True), ratio=setup.get("ratio", True))
+    model.load_state_dict(torch.load(OUT / f"pggnn{t}.pt"))
+    return model
+
+
 def main():
+    import sys
+    tag = sys.argv[1] if len(sys.argv) > 1 else ""
     plan = json.loads((DATA / "demo_plan.json").read_text())
     truth = json.loads((DATA / "design.json").read_text())["by_panic"][str(DESIGN_PANIC)]["layouts"]
-    model = PGGNN()
-    model.load_state_dict(torch.load(OUT / "pggnn.pt"))
+    model = load_model(tag)
     layouts = all_layouts(plan)
     t = time.perf_counter()
     worst = screen(model, plan, layouts)
@@ -100,7 +110,7 @@ def main():
                      "verified_s": v["worst_case_s"], "verified_passes": v["passes"]} for L, v in zip(top, checked)],
            "agreement": agreement(layouts, worst, truth),
            "agreement_physics_only": agreement(layouts, worst_phys, truth),
-           "setup": {"panic": DESIGN_PANIC, "steps": STEPS, "plan": plan["id"], "simulated": True}}
+           "setup": {"panic": DESIGN_PANIC, "steps": STEPS, "plan": plan["id"], "model": tag or "default", "simulated": True}}
     print(json.dumps({k: v for k, v in res.items() if k != "candidate_value"}, indent=1))
     (OUT / "recommend.json").write_text(json.dumps(res, indent=1))
 

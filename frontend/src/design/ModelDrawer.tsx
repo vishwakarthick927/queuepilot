@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Fragment, useEffect } from 'react'
 import type { Plan, Recommend, Results } from './data'
 import { Head, Tag, fmt } from './ui'
 
@@ -52,6 +52,11 @@ export default function ModelDrawer({ open, onClose, plan, results, recommend, s
           })}
         </section>
 
+        {results?.ablation && (
+          <div className="num grid grid-cols-[1fr_140px] gap-y-0.5 text-[13px] text-dim">
+            {results.ablation.map(r => <Fragment key={r.label}><span>{r.label}</span><span className="text-right">{r.clearance_err_s} ± {r.ci95} s</span></Fragment>)}
+          </div>
+        )}
         {results && (
           <section className="grid grid-cols-2 gap-4">
             <div className="border border-line bg-raised px-4 py-3">
