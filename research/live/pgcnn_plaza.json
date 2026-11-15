@@ -1,0 +1,49 @@
+{
+ "models": {
+  "physics": {
+   "density_error": 0.111,
+   "people_created": 0.0,
+   "danger_cells_true": 888,
+   "danger_cells_found": 807,
+   "danger_cells_missed": 81,
+   "false_alarm_cells": 312,
+   "plazas": 12
+  },
+  "cnn": {
+   "density_error": 0.444,
+   "people_created": 0.0,
+   "danger_cells_true": 888,
+   "danger_cells_found": 0,
+   "danger_cells_missed": 888,
+   "false_alarm_cells": 0,
+   "plazas": 12
+  },
+  "pgcnn": {
+   "density_error": 0.012,
+   "people_created": 0.0,
+   "danger_cells_true": 888,
+   "danger_cells_found": 873,
+   "danger_cells_missed": 15,
+   "false_alarm_cells": 24,
+   "plazas": 12
+  }
+ },
+ "passability_error": {
+  "site_plan": 0.093,
+  "pgcnn": 0.018
+ },
+ "setup": {
+  "source": "MAIN engine.plaza (data/crowd/plaza_train.npz)",
+  "train_plazas": 48,
+  "test_plazas": 12,
+  "unseen": "12 plazas never seen in training",
+  "steps": 240,
+  "dt_s": 5,
+  "grid": [
+   20,
+   32
+  ],
+  "cell_m": 2,
+  "simulated": true
+ }
+}

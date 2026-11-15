@@ -1,0 +1,38 @@
+{
+ "models": {
+  "physics": {
+   "peak_density_err": 1.28,
+   "peak_ci95": 0.5,
+   "danger_start_err_min": 12.2,
+   "danger_yes_no_agree_pct": 65.0,
+   "people_created_or_lost": 0.02,
+   "runs": 40
+  },
+  "gnn": {
+   "peak_density_err": 4.05,
+   "peak_ci95": 0.75,
+   "danger_start_err_min": 23.8,
+   "danger_yes_no_agree_pct": 30.0,
+   "people_created_or_lost": 8432.82,
+   "runs": 40
+  },
+  "pggnn": {
+   "peak_density_err": 0.53,
+   "peak_ci95": 0.23,
+   "danger_start_err_min": 0.4,
+   "danger_yes_no_agree_pct": 100.0,
+   "people_created_or_lost": 0.0,
+   "runs": 40
+  }
+ },
+ "setup": {
+  "source": "MAIN engine.crowd_data (data/crowd/venue_train.npz)",
+  "train_runs": 120,
+  "test_runs": 40,
+  "unseen": "the riverbank venue (ghat), never seen in training",
+  "steps": 480,
+  "dt_s": 5.0,
+  "train_horizon_steps": 240,
+  "simulated": true
+ }
+}
