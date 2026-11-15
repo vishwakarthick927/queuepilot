@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Guard } from '../components/Guard'
-import { design, plan, results, recommend, smokeDemo, type Design, type Frames, type Plan, type Score } from './data'
+import { buildings, design, plan, results, recommend, type Building, type Design, type Frames, type Plan, type Score, type SmokeDemo } from './data'
 import HowItWorks from './HowItWorks'
 import PlanView, { DENSITY_STOPS, densityColor } from './PlanView'
 import { Key } from './ui'
@@ -19,7 +19,17 @@ type Scene = 'door' | 'smoke'                          // fire blocks the front 
 export default function DesignStudio() {
   if (!plan) return <Empty text="No floor plan yet: waiting for data/design/demo_plan.json." />
   if (!design) return <Empty text="No results yet: waiting for data/design/design.json." />
-  return <Studio P={plan.data} D={design.data} />
+  return <Switcher />
+}
+
+// Holds which building is shown; each building gets a fresh Studio, keeping the step of the demo (try / found / play).
+function Switcher() {
+  const q = new URLSearchParams(window.location.search)
+  const list: Building[] = buildings.length ? buildings : [{ id: 'hall', name: 'Community hall', plan: plan!.data, design: design!.data, smoke: null }]
+  const [id, setId] = useState(list.find(b => b.id === q.get('b'))?.id ?? list[0].id)
+  const [mode, setMode] = useState<Mode>(q.get('play') === '1' ? 'play' : q.get('found') === '1' ? 'found' : 'try')
+  const B = list.find(b => b.id === id) ?? list[0]
+  return <Studio key={B.id} B={B} list={list} onSwitch={setId} mode0={mode} onMode={setMode} />
 }
 
 // "2 min 26 s"
@@ -34,11 +44,13 @@ function insideAt(f: Frames, s: number, total: number) {
   return { left: inside < 1 ? 0 : Math.round(inside), people: f.people[i] }      // under 1 person = empty (the simulator's rule)
 }
 
-function Studio({ P, D }: { P: Plan; D: Design }) {
+function Studio({ B, list, onSwitch, mode0, onMode }: { B: Building; list: Building[]; onSwitch: (id: string) => void; mode0: Mode; onMode: (m: Mode) => void }) {
+  const P = B.plan, D = B.design, smoke = B.smoke
   const q = new URLSearchParams(window.location.search)
   const R = D.by_panic[String(D.design_panic)]
   const chosen = R.chosen!, front = P.main_entrance
-  const [mode, setMode] = useState<Mode>(q.get('play') === '1' ? 'play' : q.get('found') === '1' ? 'found' : 'try')
+  const [mode, setModeRaw] = useState<Mode>(mode0)
+  const setMode = (m: Mode) => { setModeRaw(m); onMode(m) }
   const [mine, setMine] = useState<number[]>([front])                   // the viewer's own exits
   const [how, setHow] = useState(q.get('how') === '1')
   const [step, setStep] = useState(Number(q.get('t')) || 0)
@@ -47,7 +59,7 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
   const [howAt, setHowAt] = useState<string | undefined>()
   const total = useMemo(() => P.nodes.reduce((a, n) => a + n.people0, 0), [P])
   const limitStep = Math.round(P.safe_limit_s / P.dt_s)
-  const smokeFire = pickSmokeFire(P)                                      // the smoke fire that blocks a corridor first
+  const smokeFire = pickSmokeFire(P, D, smoke)                                      // the smoke fire that blocks a corridor first
   const frames = scene === 'smoke' && smokeFire != null && D.frames_smoke?.[String(smokeFire)] ? D.frames_smoke[String(smokeFire)] : D.frames
   const last = Math.max(frames.chosen.people.length, frames.rule_of_thumb.people.length)
   const lookup = useMemo(() => new Map(R.layouts.map(l => [l.exits.join(','), l])), [R])
@@ -94,20 +106,23 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
       <Steps active={activeStep(mode, scene, step, smokeFire, P)} onOpen={id => { setHowAt(id); setHow(true) }} />
 
       <main className="grid min-h-0 grid-cols-[1fr_400px]">
+        <div className="flex min-h-0 flex-col">
+        <div className="flex items-baseline justify-between gap-4 pr-8">
+          <BuildingTabs list={list} id={B.id} onSwitch={onSwitch} />
+          {mode !== 'play' && <p className="text-[15px] text-dim">{mode === 'try' ? 'Click the dashed circles to place exits. The front door is always there.' : 'Click any exit position to try your own layout.'}</p>}
+        </div>
         <Guard name="Floor plan">
           {mode === 'play'
-            ? <SideBySide P={P} frames={frames} scene={scene} smokeFire={smokeFire} setScene={s => { setScene(s); setStep(0); setPlaying(true) }}
+            ? <SideBySide P={P} frames={frames} scene={scene} smokeFire={smokeFire} smoke={smoke} verdictOk={D.smoke_check?.fewest_ours != null} setScene={s => { setScene(s); setStep(0); setPlaying(true) }}
                 step={step} total={total} limitStep={limitStep} />
             : (
               <div className="relative min-h-0 px-8 py-4">
                 <PlanView plan={P} exits={mode === 'found' ? chosen.exits : mine} ours={mode === 'found'}
                   onPick={toggle} tags={mode === 'found' ? tags : {}} />
-                <p className="pointer-events-none absolute bottom-3 left-8 text-[15px] text-dim">
-                  {mode === 'try' ? 'Click the dashed circles to place exits. The front door is always there.' : 'Click any exit position to try your own layout again.'}
-                </p>
               </div>
             )}
         </Guard>
+        </div>
 
         <aside className="flex min-h-0 flex-col gap-4 border-l border-line bg-panel px-7 py-5">
           {mode === 'try' && <TryPanel P={P} verdict={verdict} count={mine.length} onFind={find} />}
@@ -128,9 +143,9 @@ function Studio({ P, D }: { P: Plan; D: Design }) {
       <footer className="flex items-center gap-6 border-t border-line px-8 py-2.5 text-[15px] text-faint">
         <span>Crowd behaviour is simulated. QueuePilot never recommends fewer exits than the building code allows.</span>
         {(results?.stub || recommend?.stub) && <span className="text-alert">stub data</span>}
-        <span className="ml-auto">{total} people · panicked crowd · a fire can block any exit</span>
+        <span className="ml-auto">{B.name}: {total} people · panicked crowd · a fire can block any exit</span>
       </footer>
-      <HowItWorks open={how} at={howAt} onClose={() => { setHow(false); setHowAt(undefined) }} plan={P} design={D} results={results?.data ?? null} recommend={recommend?.data ?? null} />
+      <HowItWorks open={how} at={howAt} onClose={() => { setHow(false); setHowAt(undefined) }} plan={P} design={D} results={results?.data ?? null} recommend={B.id === 'hall' ? recommend?.data ?? null : null} />
     </div>
   )
 }
@@ -156,21 +171,43 @@ function TryPanel({ P, verdict, count, onFind }: { P: Plan; verdict?: Score; cou
   )
 }
 
-// Step 2: one sentence, and at most three numbers.
+// Step 2: one sentence, and at most three numbers. "Fewer exits" only when the data says so;
+// otherwise "same exits, placed better, everyone out X s sooner" (compared with the same number spread evenly).
 function Result({ P, R, chosen }: { P: Plan; R: Design['by_panic'][string]; chosen: Score }) {
   const n = R.chosen_n_exits, rule = R.rule_n_exits, t = chosen.worst_case_s ?? 0
+  const saved = R.exits_saved ?? 0
+  const evenSame = R.rule_same_count?.worst_case_s ?? R.rule_of_thumb?.worst_case_s ?? null
+  const sooner = evenSame != null ? Math.round(evenSame - t) : null
   return (
     <>
       <p className="text-[22px] font-semibold leading-snug">
         <span className="text-qp">{n} exits placed by QueuePilot</span> get everyone out in {minsec(t)}.
-        {rule != null && <span className="text-dim"> Spread evenly, you would need {rule}.</span>}
+        {saved > 0 && rule != null && <span className="text-dim"> Spread evenly, you would need {rule}.</span>}
+        {saved <= 0 && sooner != null && sooner > 0 && <span className="text-dim"> The same {n} exits spread evenly take {sooner} s longer.</span>}
+        {saved <= 0 && (sooner == null || sooner <= 0) && <span className="text-dim"> Spreading them evenly works just as well here.</span>}
       </p>
       <div className="grid grid-cols-1 gap-2">
-        <Big label="Exits needed" value={String(n)} note={rule != null ? `instead of ${rule}` : undefined} />
+        <Big label="Exits needed" value={String(n)} note={rule != null ? (saved > 0 ? `instead of ${rule}` : `same as spread evenly`) : undefined} />
         <Big label="Time to get everyone out" value={clock(t)} note={`limit ${clock(P.safe_limit_s)}`} />
-        {R.area_freed_m2 != null && <Big label="Floor space saved" value={`${R.area_freed_m2} m²`} note="for rooms instead of exit stairs and lobbies" />}
+        {saved > 0 && R.area_freed_m2 ? <Big label="Floor space saved" value={`${R.area_freed_m2} m²`} note="for rooms instead of exit stairs and lobbies" />
+          : sooner != null && sooner > 0 ? <Big label="Faster than spread evenly" value={`${sooner} s`} note={`same ${n} exits, better places`} /> : null}
       </div>
     </>
+  )
+}
+
+// One quiet segmented control above the plan: which building.
+function BuildingTabs({ list, id, onSwitch }: { list: Building[]; id: string; onSwitch: (id: string) => void }) {
+  if (list.length < 2) return null
+  return (
+    <div className="flex items-center gap-3 px-8 pt-3" role="tablist" aria-label="Building">
+      {list.map(b => (
+        <button key={b.id} role="tab" aria-selected={b.id === id} onClick={() => onSwitch(b.id)}
+          className={`border-b-2 pb-1 text-[15px] ${b.id === id ? 'border-ink text-ink' : 'border-transparent text-faint hover:text-dim'}`}>
+          {b.name.replace(/ (floor|wing|level)$/i, '')}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -185,18 +222,18 @@ function Big({ label, value, note }: { label: string; value: string; note?: stri
 }
 
 // Step 3: both buildings, same fire, same panicked crowd, same clock. The stamp at the time limit is the pitch.
-function SideBySide({ P, frames, scene, smokeFire, setScene, step, total, limitStep }: {
-  P: Plan; frames: { chosen: Frames; rule_of_thumb: Frames }; scene: Scene; smokeFire: number | null; setScene: (s: Scene) => void
+function SideBySide({ P, frames, scene, smokeFire, smoke: SD, verdictOk, setScene, step, total, limitStep }: {
+  P: Plan; frames: { chosen: Frames; rule_of_thumb: Frames }; scene: Scene; smokeFire: number | null; smoke: SmokeDemo | null; verdictOk: boolean; setScene: (s: Scene) => void
   step: number; total: number; limitStep: number
 }) {
   const t = step * P.dt_s, stamped = step >= limitStep
   const sides = [['rule_of_thumb', 'spread evenly', 'text-ink', false], ['chosen', 'placed by QueuePilot', 'text-qp', true]] as const
   const sf = scene === 'smoke' && smokeFire != null ? P.smoke_fires?.find(f => f.id === smokeFire) : undefined
-  const sd = sf ? smokeDemo?.data.fires.find(f => f.fire === smokeFire) : undefined
-  const k = Math.max(0, Math.floor((step - 1) / (smokeDemo?.data.frame_every_steps ?? 3)))   // smoke frame k = after step 3k + 1
+  const sd = sf ? SD?.fires.find(f => f.fire === smokeFire) : undefined
+  const k = Math.max(0, Math.floor((step - 1) / (SD?.frame_every_steps ?? 3)))   // smoke frame k = after step 3k + 1
   const smoke = sd && step > 0 ? {
-    cells: sd.smoke[Math.min(k, sd.smoke.length - 1)], cell: smokeDemo!.data.cell_m,
-    x0: smokeDemo!.data.origin_tile[0] * 6 - 3, y0: smokeDemo!.data.origin_tile[1] * 6 - 3,
+    cells: sd.smoke[Math.min(k, sd.smoke.length - 1)], cell: SD!.cell_m,
+    x0: SD!.origin_tile[0] * 6 - 3, y0: SD!.origin_tile[1] * 6 - 3,
   } : undefined
   const closed = sf ? sf.close.filter(c => c.step <= step).map(c => c.edge) : []
   const room = sf ? P.nodes[sf.start_node]?.name ?? 'a room' : ''
@@ -229,7 +266,7 @@ function SideBySide({ P, frames, scene, smokeFire, setScene, step, total, limitS
                 <PlanView plan={P} exits={f.exits} blocked={f.lost_exit ?? null} people={people ?? P.nodes.map(n => n.people0)} compact ours={ours}
                   smoke={smoke} closed={closed} fireNode={sf?.start_node ?? null} />
               </div>
-              {stamped && (
+              {stamped && (scene === 'door' || verdictOk) && (
                 <div className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -rotate-6 border-4 bg-bg/85 px-4 py-2 text-[22px] font-semibold uppercase tracking-wide ${atLimit > 0 ? 'border-alert text-alert' : 'border-qp text-qp'}`}>
                   {atLimit > 0 ? `${atLimit} still inside` : 'Everyone out'}
                 </div>
@@ -243,15 +280,16 @@ function SideBySide({ P, frames, scene, smokeFire, setScene, step, total, limitS
         {DENSITY_STOPS.map(d => <i key={d} className="inline-block h-3 w-5" style={{ background: densityColor(d) }} />)}
         <span>empty to packed</span>
         {sf && <><i className="ml-6 inline-block h-3 w-5 bg-[#c7ccd4]/70" /><span>smoke</span><i className="ml-4 inline-block h-1 w-5 bg-alert" /><span>corridor blocked by smoke</span></>}
+        {sf && !verdictOk && <span className="ml-auto text-faint">this fire spreads too fast for any layout here: smoke shown as a picture only</span>}
       </div>
     </div>
   )
 }
 
 // The smoke fire whose smoke blocks a corridor first (the clearest one to show).
-function pickSmokeFire(P: Plan) {
+function pickSmokeFire(P: Plan, D: Design, smoke: SmokeDemo | null) {
   const f = (P.smoke_fires ?? []).filter(x => x.close.length).sort((a, b) => a.close[0].step - b.close[0].step)[0]
-  return f && design?.data.frames_smoke?.[String(f.id)] && smokeDemo ? f.id : null
+  return f && D.frames_smoke?.[String(f.id)] && smoke ? f.id : null
 }
 
 // Which of the three steps is lit: smoke spreading -> people moving -> the verdict on the exits.

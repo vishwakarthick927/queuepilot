@@ -29,6 +29,7 @@ export type Design = {
   frames: { chosen: Frames; rule_of_thumb: Frames }
   frames_scenario?: string; frames_fire?: number | null; m2_per_exit?: number
   frames_smoke?: Record<string, { chosen: Frames; rule_of_thumb: Frames }>
+  smoke_check?: { fewest_ours: number | null; fewest_rule: number | null }
   across_plans?: { n_plans: number; solved_both: number; mean_exits_ours: number | null; mean_exits_rule: number | null; plans_where_ours_needs_fewer: number; plans_where_rule_never_passes: number }
 }
 export type ModelScore = { clearance_err_s: number; ci95: number; people_error: number; runs?: number }
@@ -75,6 +76,16 @@ export type SmokeDemo = { cell_m: number; sub: number; frame_every_steps: number
 export type CnnScore = { smoke_error: number; smoke_created: number; block_time_err_s: number; block_time_ci95: number; passages?: number; fires?: number }
 export type CnnResults = { models: { physics: CnnScore; cnn: CnnScore; pgcnn: CnnScore }; vent_error?: { textbook: number; pgcnn: number }; setup?: { test_fires?: number } }
 export const smokeDemo = pick<SmokeDemo>('smoke_demo.json')
+
+// Building switcher (round 6): data/design/buildings.json lists each building's plan, design and smoke files.
+export type BuildingEntry = { id: string; name: string; building: string; people: number; plan: string; design: string; smoke: string }
+export type Building = { id: string; name: string; plan: Plan; design: Design; smoke: SmokeDemo | null }
+const files = import.meta.glob(['../../../data/design/buildings.json', '../../../data/design/demo_plan.json', '../../../data/design/design.json',
+  '../../../data/design/smoke_demo.json', '../../../data/design/buildings/*/*.json'], { eager: true, import: 'default' })
+const file = (rel: string) => files['../../../data/design/' + rel]
+export const buildings: Building[] = ((file('buildings.json') as BuildingEntry[] | undefined) ?? [])
+  .filter(b => file(b.plan) && file(b.design))
+  .map(b => ({ id: b.id, name: b.name, plan: file(b.plan) as Plan, design: file(b.design) as Design, smoke: (file(b.smoke) as SmokeDemo) ?? null }))
 export const cnnResults = pick<CnnResults>('pgcnn_results.json')
 export const cnnDemo = pick<{ fires: SmokeFire[] }>('pgcnn_demo.json')
 

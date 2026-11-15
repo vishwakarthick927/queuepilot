@@ -87,7 +87,8 @@ export default function PlanView({ plan, exits, blocked = null, people, fireNode
             <text x={n.x} y={n.y} fontSize={1.7} textAnchor="middle" dominantBaseline="central" className="num" fontWeight={600}
               fill={density(n.id) > 1.6 ? 'var(--color-bg)' : 'var(--color-ink)'}>{Math.round(people[n.id])}</text>
           ) : (
-            <text x={n.x} y={n.y} fontSize={1.1} textAnchor="middle" dominantBaseline="central" fill="var(--color-dim)">{n.name ?? `Room ${n.id}`}</text>
+            <text x={n.x} y={n.y} fontSize={Math.min(1.1, (ROOM - 0.6) / (0.58 * (n.name ?? 'Room 00').replace('Classroom', 'Class').length))} textAnchor="middle" dominantBaseline="central"
+              fill="var(--color-dim)">{(n.name ?? `Room ${n.id}`).replace('Classroom', 'Class')}</text>
           )}
         </g>
       ))}
