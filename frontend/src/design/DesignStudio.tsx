@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Guard } from '../components/Guard'
 import { buildings, design, plan, results, recommend, type Building, type Design, type Frames, type Plan, type Score, type SmokeDemo } from './data'
 import HowItWorks from './HowItWorks'
+import Physics from './Physics'
 import PlanView, { DENSITY_STOPS, densityColor } from './PlanView'
 import { Key } from './ui'
 
@@ -17,6 +18,7 @@ type Mode = 'try' | 'found' | 'play'
 type Scene = 'door' | 'smoke'                          // fire blocks the front door  |  smoke fills a corridor
 
 export default function DesignStudio() {
+  if (new URLSearchParams(window.location.search).get('physics') === '1') return <Physics />
   if (!plan) return <Empty text="No floor plan yet: waiting for data/design/demo_plan.json." />
   if (!design) return <Empty text="No results yet: waiting for data/design/design.json." />
   return <Switcher />
@@ -101,9 +103,9 @@ function Studio({ B, list, onSwitch, mode0, onMode }: { B: Building; list: Build
           <h1 className="mt-2 text-[44px] font-semibold leading-[1.1] tracking-tight">More exits don't make a building safer. <span className="text-qp">The right ones do.</span></h1>
           <p className="mt-2 text-[22px] text-dim">QueuePilot tells architects where to place fire exits, so a building needs fewer of them and still empties in time.</p>
         </div>
-        <button onClick={() => setHow(true)} className="mb-1 ml-auto shrink-0 rounded-sm border border-line-strong px-4 py-2 text-[15px] text-dim hover:border-ink hover:text-ink">How it works<Key k="H" /></button>
+
       </header>
-      <Steps active={activeStep(mode, scene, step, smokeFire, P)} onOpen={id => { setHowAt(id); setHow(true) }} />
+      <Steps active={activeStep(mode, scene, step, smokeFire, P)} onOpen={id => { setHowAt(id); setHow(true) }} onHow={() => setHow(true)} />
 
       <main className="grid min-h-0 grid-cols-[1fr_400px]">
         <div className="flex min-h-0 flex-col">
@@ -301,7 +303,7 @@ function activeStep(mode: Mode, scene: Scene, step: number, smokeFire: number | 
 }
 
 // One slim strip: the two models and what they decide, in plain words. Each opens its block in "How it works".
-function Steps({ active, onOpen }: { active: number; onOpen: (id: string) => void }) {
+function Steps({ active, onOpen, onHow }: { active: number; onOpen: (id: string) => void; onHow: () => void }) {
   const steps = [['smoke', 'Where the smoke goes', 'PG-CNN'], ['people', 'Where the people go', 'PG-GNN'], ['exits', 'Where the exits go', 'QueuePilot']] as const
   return (
     <nav className="flex items-center gap-2 border-b border-line bg-panel px-8 py-2" aria-label="How QueuePilot decides">
@@ -314,6 +316,8 @@ function Steps({ active, onOpen }: { active: number; onOpen: (id: string) => voi
           </button>
         </div>
       ))}
+      <a href="?physics=1" className="ml-auto px-2 py-1 text-[15px] text-dim underline-offset-4 hover:text-ink hover:underline">Why this physics</a>
+      <button onClick={onHow} className="rounded-sm border border-line-strong px-3 py-1 text-[15px] text-dim hover:border-ink hover:text-ink">How it works<Key k="H" /></button>
     </nav>
   )
 }

@@ -46,6 +46,7 @@ export default function HowItWorks({ open, at, onClose, plan, design, results, r
           learns="The fastest layouts are re-run in a detailed crowd simulation before anything is recommended, and we never go below the building code."
           numbers={null} />
 
+        <a href="?physics=1" className="border-t border-line pt-4 text-[15px] text-dim underline-offset-4 hover:text-ink hover:underline">Why not Hamiltonian or Lagrangian mechanics? A crowd conserves people, not energy. See the test →</a>
         <p className="mt-auto text-[13px] leading-snug text-faint">Method: Yu &amp; Wang, "Learning dynamical systems from data: an introduction to physics-guided deep learning", PNAS 2024. Every smoke and crowd result here is simulated.</p>
       </aside>
     </div>
