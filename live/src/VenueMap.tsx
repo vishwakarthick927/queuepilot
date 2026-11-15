@@ -19,6 +19,7 @@ type Props = {
   density: number[]         // people per m² per zone, this instant
   openGates: Set<number>    // gate ids open now
   flowing: boolean          // draw moving dots along the passages
+  learned?: { gate: string; learned_share: number }  // once the twin has found the failing gate, tag it on the map
 }
 
 // Elbow path between two zone centres: across first, then up or down. Reads like a floor plan, not a mind map.
@@ -27,7 +28,7 @@ function elbow(a: Zone, b: Zone) {
   return `M${a.x},${a.y} L${b.x},${a.y} L${b.x},${b.y}`
 }
 
-export default function VenueMap({ venue, density, openGates, flowing }: Props) {
+export default function VenueMap({ venue, density, openGates, flowing, learned }: Props) {
   const z = venue.zones
   const pad = 34
   const x0 = Math.min(...z.map((q) => q.x - q.w / 2)) - pad
@@ -65,6 +66,9 @@ export default function VenueMap({ venue, density, openGates, flowing }: Props) 
               {open ? null : <line x1={q.x - 9} x2={q.x + 9} y1={q.y + 2} y2={q.y + 2} />}
               <text x={q.x} y={q.y - 9} textAnchor="middle" className="gate-name">{q.name}</text>
               {!open && <text x={q.x + 20} y={q.y + 6} className="gate-tag">closed</text>}
+              {learned && learned.gate === q.name && (
+                <text x={q.x + 20} y={q.y + 6} className="gate-tag learned">at {Math.round(learned.learned_share * 100)}%</text>
+              )}
             </g>
           )
         }

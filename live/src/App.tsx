@@ -3,6 +3,7 @@ import { VENUES, TAB, densityAt, frameAt, lastFrame, fmt1, type Venue } from './
 import VenueMap from './VenueMap'
 import Timeline from './Timeline'
 import { NowRail, DoRail } from './Rails'
+import HowItWorks from './HowItWorks'
 
 // Modes: what no one does (today), the twin + an approved plan (qp), or both at once (side).
 export type Mode = 'today' | 'qp' | 'side'
@@ -29,6 +30,8 @@ export default function App() {
   const [f, setF] = useState(q.has('t') ? frameAt(venue, Number(q.get('t'))) : 0)
   const [playing, setPlaying] = useState(q.get('play') === '1')
   const [approved, setApproved] = useState(q.get('ok') === '1')
+  const [how, setHow] = useState(q.get('how') === '1')
+  const closeHow = useCallback(() => setHow(false), [])
 
   const alarmF = frameAt(venue, venue.forecast.alarm_at_min)
   const dangerF = frameAt(venue, venue.today.danger_at_min)
@@ -69,6 +72,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       const k = e.key.toLowerCase()
+      if (k === 'h') { setHow((h) => !h); return }
       if (k === ' ') { e.preventDefault(); play() }
       else if (k >= '1' && k <= '4' && VENUES[+k - 1]) pickVenue(VENUES[+k - 1].id)
       else if (k === 't') pickMode('today')
@@ -96,7 +100,8 @@ export default function App() {
             {withPlan ? `With QueuePilot: plan approved at ${fmt1(venue.forecast.alarm_at_min)} min` : 'No intervention'}
           </div>
         )}
-        <VenueMap venue={venue} density={densityAt(r, f)} openGates={openGates(venue, withPlan, f)} flowing={playing} />
+        <VenueMap venue={venue} density={densityAt(r, f)} openGates={openGates(venue, withPlan, f)} flowing={playing}
+          learned={(mode === 'qp' || withPlan) && f >= alarmF ? venue.forecast.hidden_problem : undefined} />
         {crushed && (
           <div className="stamp danger">
             <b>DANGER</b>
@@ -125,6 +130,7 @@ export default function App() {
           ))}
         </nav>
         <span className="spacer" />
+        <button className="linkbtn" onClick={() => setHow(true)}>How it works <kbd>H</kbd></button>
         <nav className="seg" aria-label="Mode">
           {MODES.map((m) => (
             <button key={m.id} aria-pressed={m.id === mode} onClick={() => pickMode(m.id)}>
@@ -160,6 +166,7 @@ export default function App() {
         <span className="spacer" />
         <span className="inspired">Inspired by <b>{venue.inspired_by.event}</b>, {venue.inspired_by.date}: {venue.inspired_by.toll}. Layout is schematic, not a reconstruction.</span>
       </footer>
+      {how && <HowItWorks venue={venue} onClose={closeHow} />}
     </div>
   )
 }
