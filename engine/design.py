@@ -266,10 +266,44 @@ def build(plan, with_across=True):
     return out
 
 
+BUILDINGS = [("apartment", "bar", 12), ("school", "L", 12), ("office", "T", 11), ("cinema", "ring", 11)]
+
+
+def build_buildings():
+    """The other buildings for the page's plan switcher. Same pipeline as the demo hall, 8 exit positions each.
+    Writes data/design/buildings/<id>/{plan,design,smoke}.json and the index data/design/buildings.json."""
+    from engine import smoke
+    index = [dict(id="hall", name="Community hall", building="hall", people=plans.total_people(json.loads((OUT / "demo_plan.json").read_text())),
+                  plan="demo_plan.json", design="design.json", smoke="smoke_demo.json")]
+    for style, shape, seed in BUILDINGS:
+        plan = plans.make_plan(seed, shape, n_candidates=8, style=style)
+        shown = smoke.demo_for(plan)
+        d = build(plan, with_across=False)
+        chosen = d["chosen"]["exits"] if d["chosen"] else rule_of_thumb(plan, 2)
+        d["smoke_check"] = smoke_check(plan, chosen)
+        d["frames_smoke"] = {str(f["id"]): dict(
+            chosen=frames(plan, chosen, DESIGN_PANIC, f, None, f"smoke fire {f['id']}"),
+            rule_of_thumb=frames(plan, rule_of_thumb(plan, len(chosen)), DESIGN_PANIC, f, None, f"smoke fire {f['id']}")) for f in plan["smoke_fires"]}
+        folder = OUT / "buildings" / style
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "plan.json").write_text(json.dumps(plan, indent=1))
+        (folder / "design.json").write_text(json.dumps(d))
+        (folder / "smoke.json").write_text(json.dumps(shown))
+        index.append(dict(id=style, name=plan["name"], building=style, people=plans.total_people(plan),
+                          plan=f"buildings/{style}/plan.json", design=f"buildings/{style}/design.json", smoke=f"buildings/{style}/smoke.json"))
+        m = d["by_panic"][str(DESIGN_PANIC)]
+        print(style, "| people", plans.total_people(plan), "| ours", m["chosen_n_exits"], m["chosen"] and (m["chosen"]["exits"], m["chosen"]["worst_case_s"]),
+              "| spread evenly needs", m["rule_n_exits"], "| evenly, same count:", m["rule_same_count"] and (m["rule_same_count"]["worst_case_s"], m["rule_same_count"]["passes"]),
+              "| smoke check ours/rule", d["smoke_check"]["fewest_ours"], d["smoke_check"]["fewest_rule"], "| frames:", d["frames_scenario"])
+    (OUT / "buildings.json").write_text(json.dumps(index, indent=1))
+
+
 if __name__ == "__main__":
     plan = json.loads((OUT / "demo_plan.json").read_text())
     if len(sys.argv) > 2 and sys.argv[1] == "verify":
         print(json.dumps(verify(plan, json.loads(sys.argv[2])), indent=1))
+    elif len(sys.argv) > 1 and sys.argv[1] == "buildings":
+        build_buildings()
     elif len(sys.argv) > 1 and sys.argv[1] == "smoke":            # needs demo_plan.json with smoke_fires (python -m engine.smoke)
         d = json.loads((OUT / "design.json").read_text())
         d["smoke_check"] = smoke_check(plan, d["chosen"]["exits"])

@@ -48,8 +48,18 @@ def corridor_cells(shape, rng):
     raise ValueError(shape)
 
 
-def make_plan(seed, shape=None, n_candidates=10, name=None):
-    """Build one random floor plan. Same seed -> same plan."""
+# Building types for the page's plan switcher. Each one only changes what the rooms are like.
+STYLES = dict(
+    apartment=dict(label="Apartment floor", room="Flat", area=(55, 95), density=[0.05, 0.07, 0.09], doors=[0.9, 1.0], corridor=1.8, fill=0.95),
+    school=dict(label="School wing", room="Classroom", area=(55, 70), density=[0.5, 0.6, 0.65], doors=[1.0, 1.2], corridor=2.4, fill=0.9),
+    office=dict(label="Office floor", room="Office", area=(40, 120), density=[0.1, 0.15, 0.2, 0.3], doors=[0.9, 1.2, 1.8], corridor=2.4, fill=0.85),
+    cinema=dict(label="Cinema level", room="Screen", area=(110, 160), density=[0.7, 0.8, 0.9], doors=[1.8, 2.4], corridor=3.0, fill=0.25),
+)
+
+
+def make_plan(seed, shape=None, n_candidates=10, name=None, style=None):
+    """Build one random floor plan. Same seed -> same plan. style = one of STYLES (None = the general mix)."""
+    st = STYLES.get(style)
     rng = random.Random(seed)
     shape = shape or rng.choice(["bar", "L", "T", "ring"])
     cells = corridor_cells(shape, rng)
@@ -62,7 +72,7 @@ def make_plan(seed, shape=None, n_candidates=10, name=None):
 
     def add_node(kind, gx, gy, area, people):
         count[kind] += 1
-        label = dict(room="Room", corridor="Corridor", exit="Exit")[kind] + " " + (chr(64 + count[kind]) if kind == "exit" else str(count[kind]))
+        label = dict(room=st["room"] if st else "Room", corridor="Corridor", exit="Exit")[kind] + " " + (chr(64 + count[kind]) if kind == "exit" else str(count[kind]))
         nodes.append(dict(id=len(nodes), kind=kind, name=label, x=gx * CELL, y=gy * CELL, w_m=SIZE[kind], h_m=SIZE[kind],
                           area_m2=round(area, 1), people0=people))
         return len(nodes) - 1
@@ -72,7 +82,7 @@ def make_plan(seed, shape=None, n_candidates=10, name=None):
         return len(edges) - 1
 
     # 1. corridor pieces, joined to their grid neighbours
-    corridor_width = rng.choice([1.8, 2.4, 3.0])
+    corridor_width = st["corridor"] if st else rng.choice([1.8, 2.4, 3.0])
     for c in cells:
         cell_node[c] = add_node("corridor", c[0], c[1], CORRIDOR_AREA, 0)
     for (x, y) in cells:
@@ -116,19 +126,20 @@ def make_plan(seed, shape=None, n_candidates=10, name=None):
     # 3. rooms on the remaining free squares
     for c in cells:
         for f in free_sides(c):
-            if rng.random() < 0.8:
+            if rng.random() < (st["fill"] if st else 0.8):
                 used.add(f)
-                area = rng.uniform(40, 110)
-                people = int(round(area * rng.choice([0.15, 0.3, 0.45, 0.6])))
+                area = rng.uniform(*(st["area"] if st else (40, 110)))
+                people = int(round(area * rng.choice(st["density"] if st else [0.15, 0.3, 0.45, 0.6])))
                 room = add_node("room", f[0], f[1], area, people)
-                add_edge(room, cell_node[c], rng.choice([0.9, 1.2, 1.8]), 4.0)
+                add_edge(room, cell_node[c], rng.choice(st["doors"] if st else [0.9, 1.2, 1.8]), 4.0)
 
     # 4. fires: each one cuts the corridor at one place, 10 s after the alarm
     cut_edges = list(range(n_corridor_edges))
     rng.shuffle(cut_edges)
     fires = [dict(id=i, start_node=edges[e]["a"], close=[dict(edge=e, step=5)]) for i, e in enumerate(sorted(cut_edges[:4]))]
 
-    plan = dict(id=f"plan_{seed}", name=name or f"{shape} plan {seed}", shape=shape, **CONSTANTS,
+    plan = dict(id=f"plan_{seed}" if not st else f"{style}_{seed}", name=name or (st["label"] if st else f"{shape} plan {seed}"),
+                shape=shape, building=style or "general", **CONSTANTS,
                 nodes=nodes, edges=edges, candidates=candidates, main_entrance=main, fires=fires)
     return plan
 

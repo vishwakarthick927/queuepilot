@@ -1,0 +1,47 @@
+[
+ {
+  "id": "hall",
+  "name": "Community hall",
+  "building": "hall",
+  "people": 452,
+  "plan": "demo_plan.json",
+  "design": "design.json",
+  "smoke": "smoke_demo.json"
+ },
+ {
+  "id": "apartment",
+  "name": "Apartment floor",
+  "building": "apartment",
+  "people": 67,
+  "plan": "buildings/apartment/plan.json",
+  "design": "buildings/apartment/design.json",
+  "smoke": "buildings/apartment/smoke.json"
+ },
+ {
+  "id": "school",
+  "name": "School wing",
+  "building": "school",
+  "people": 412,
+  "plan": "buildings/school/plan.json",
+  "design": "buildings/school/design.json",
+  "smoke": "buildings/school/smoke.json"
+ },
+ {
+  "id": "office",
+  "name": "Office floor",
+  "building": "office",
+  "people": 228,
+  "plan": "buildings/office/plan.json",
+  "design": "buildings/office/design.json",
+  "smoke": "buildings/office/smoke.json"
+ },
+ {
+  "id": "cinema",
+  "name": "Cinema level",
+  "building": "cinema",
+  "people": 171,
+  "plan": "buildings/cinema/plan.json",
+  "design": "buildings/cinema/design.json",
+  "smoke": "buildings/cinema/smoke.json"
+ }
+]

@@ -167,10 +167,9 @@ def dataset(n_plans=60, name="smoke_train", first_seed=5000):
     print(f"{name}: {len(rows)} fires on {n_plans} plans ({n_test} held out), smoke {d['smoke'].shape}")
 
 
-def demo():
-    """Demo plan: smoke frames for the page + smoke-made fire scenarios + what the textbook would have predicted."""
-    path = OUT / "demo_plan.json"
-    plan = add_windows(json.loads(path.read_text()))
+def demo_for(plan):
+    """For one plan: add smoke-made fire scenarios to it, and return the smoke frames the page draws."""
+    add_windows(plan)
     g = grid(plan)
     textbook = np.where(g["feats"][0] + g["feats"][1] > 0, VENT_TEXTBOOK, 0).astype(np.float32)
     fires, shown = [], []
@@ -181,16 +180,23 @@ def demo():
         shown.append(dict(fire=i, start_node=start, close=fire["close"], close_textbook=blocked_edges(plan, book, g),
                           smoke=np.round(truth[::3], 2).tolist(), smoke_textbook=np.round(book[::3], 2).tolist()))
     plan["smoke_fires"] = fires
-    path.write_text(json.dumps(plan, indent=1))
-    (OUT / "smoke_demo.json").write_text(json.dumps(dict(
+    return dict(
         simulated=True, sub=SUB, cell_m=plans.CELL / SUB, dt_s=plan["dt_s"], frame_every_steps=3, block_level=BLOCK,
         height=H, width=W, inside=g["inside"].astype(int).tolist(), node=g["node"].tolist(),
         origin_tile=[round(min(n["x"] for n in plan["nodes"]) / plans.CELL), round(min(n["y"] for n in plan["nodes"]) / plans.CELL)],
-        fires=shown)))
-    for f in shown:
+        fires=shown)
+
+
+def demo():
+    """Demo plan: smoke frames for the page + smoke-made fire scenarios + what the textbook would have predicted."""
+    path = OUT / "demo_plan.json"
+    plan = json.loads(path.read_text())
+    shown = demo_for(plan)
+    path.write_text(json.dumps(plan, indent=1))
+    (OUT / "smoke_demo.json").write_text(json.dumps(shown))
+    for f in shown["fires"]:
         print("fire at node", f["start_node"], "| truth blocks", [(c["edge"], c["step"] * 2) for c in f["close"]],
               "| textbook says", [(c["edge"], c["step"] * 2) for c in f["close_textbook"]], "(edge, seconds)")
-    return plan, fires
 
 
 if __name__ == "__main__":
