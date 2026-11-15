@@ -57,4 +57,6 @@
 | W2 | research/design/recommend.py: screen all layouts with PG-GNN, candidate value scores, verify top 5 via M5 → recommend.json | WIN | In progress (claimed 10:35) |
 | W3 | frontend/src/design/: Design Studio page (new default route) | WIN | In progress (claimed 10:35) |
 | W4 | Side-by-side evacuation animation, model drawer, polish | WIN | In progress (claimed 10:35) |
+| M6 | CONSTRAINT 3 (PG-CNN): engine/smoke.py: floor plan → grid image, smoke physics with hidden venting, smoke-made fire scenarios (`smoke_fires`), smoke_train/sample.npz, smoke_demo.json, design.json `smoke_check` + `frames_smoke` | MAIN | Done |
+| W5 | CONSTRAINT 3: research/design/pgcnn.py (port of flood water.py to smoke: physics / CNN only / PG-CNN, held-out plans) → pgcnn_results.json + predicted smoke frames; page shows both models: pipeline strip + smoke overlay | WIN (proposed) | Todo |
 

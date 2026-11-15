@@ -14,3 +14,4 @@ research/flood/*.npy
 # generated training set (run python -m engine.design_data)
 data/design/train.npz
 data/design/train_plans.json
+data/design/smoke_train.npz

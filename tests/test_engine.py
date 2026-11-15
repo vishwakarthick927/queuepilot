@@ -138,6 +138,17 @@ def test_maxflow_bound_is_below_simulated_time():
     assert design.flow_bound(p, layout)["bound_s"] <= evac.simulate(p, layout, panic=0.0)["clearance_s"]
 
 
+def test_smoke_only_comes_from_the_fire_and_blocks_corridors():
+    from engine import smoke
+    p = smoke.add_windows(_demo())
+    g = smoke.grid(p)
+    start = p["fires"][0]["start_node"]
+    s = smoke.run(p, start, g=g)
+    assert s.min() >= 0 and (s[:, g["inside"] == 0] == 0).all()             # no negative smoke, none outside the walls
+    assert s[-1].sum() <= smoke.SOURCE * (g["node"] == start).sum() * len(s)  # never more smoke than the fire made
+    assert len(smoke.smoke_fire(p, start, g=g)["close"]) >= 1                # it blocks at least one corridor passage
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):

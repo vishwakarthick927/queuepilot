@@ -29,10 +29,11 @@ DESIGN_PANIC = 0.8            # layouts are judged under panic, not ideal behavi
 EXIT_CORE_M2 = 20.0           # floor area one exit (door, lobby, protected route) takes: a stated assumption
 
 
-def scenarios(plan, layout):
-    """Every situation a layout must survive: (label, fire, lost_exit)."""
+def scenarios(plan, layout, fires_key="fires"):
+    """Every situation a layout must survive: (label, fire, lost_exit).
+    fires_key="smoke_fires" uses the fire scenarios made by the smoke model (engine/smoke.py) instead."""
     out = [("no fire", None, None)]
-    out += [(f"fire {f['id']} cuts the corridor", f, None) for f in plan["fires"]]
+    out += [(f"fire {f['id']} cuts the corridor", f, None) for f in plan[fires_key]]
     out += [(f"fire blocks exit {c}", None, c) for c in layout]
     return out
 
@@ -49,11 +50,11 @@ def travel_ok(plan, layout):
     return worst <= plan["max_travel_m"], round(worst, 1)
 
 
-def score(plan, layout, panic=DESIGN_PANIC):
+def score(plan, layout, panic=DESIGN_PANIC, fires_key="fires"):
     """Worst-case clearance time of one layout. A scenario that never clears counts as a failure."""
     layout = sorted(layout)
     worst_s, worst_label, no_fire_s, failed = 0.0, None, None, False
-    for label, fire, lost in scenarios(plan, layout):
+    for label, fire, lost in scenarios(plan, layout, fires_key):
         r = evac.simulate(plan, layout, fire=fire, lost_exit=lost, panic=panic, record=False)
         t = r["clearance_s"]
         if label == "no fire":
@@ -172,6 +173,21 @@ def verify(plan, layouts, panic=DESIGN_PANIC):
     return [score(plan, l, panic) for l in layouts]
 
 
+def smoke_check(plan, chosen, k_max=5):
+    """End-to-end check of the two-model pipeline: fire scenarios made by the SMOKE model (several corridors
+    closing over time) instead of the simple one-cut fires. Does the chosen layout still pass? What is best?"""
+    key = "smoke_fires"
+    out = dict(chosen=score(plan, chosen, fires_key=key), rule_same_count=score(plan, rule_of_thumb(plan, len(chosen)), fires_key=key))
+    for k in range(2, k_max + 1):
+        best = min((score(plan, l, fires_key=key) for l in all_layouts(plan, k)), key=sort_key)
+        rule = score(plan, rule_of_thumb(plan, k), fires_key=key)
+        out.setdefault("curve", []).append(dict(n_exits=k, ours_s=best["worst_case_s"], ours_passes=best["passes"], ours_exits=best["exits"],
+                                                rule_s=rule["worst_case_s"], rule_passes=rule["passes"]))
+    out["fewest_ours"] = next((c["n_exits"] for c in out["curve"] if c["ours_passes"]), None)
+    out["fewest_rule"] = next((c["n_exits"] for c in out["curve"] if c["rule_passes"]), None)
+    return out
+
+
 def frames(plan, layout, panic, fire=None, lost_exit=None, label="no fire"):
     """People per node per step, for the page's animation (1 decimal to keep the file small)."""
     r = evac.simulate(plan, layout, fire=fire, lost_exit=lost_exit, panic=panic)
@@ -254,6 +270,11 @@ if __name__ == "__main__":
     plan = json.loads((OUT / "demo_plan.json").read_text())
     if len(sys.argv) > 2 and sys.argv[1] == "verify":
         print(json.dumps(verify(plan, json.loads(sys.argv[2])), indent=1))
+    elif len(sys.argv) > 1 and sys.argv[1] == "smoke":            # needs demo_plan.json with smoke_fires (python -m engine.smoke)
+        d = json.loads((OUT / "design.json").read_text())
+        d["smoke_check"] = smoke_check(plan, d["chosen"]["exits"])
+        (OUT / "design.json").write_text(json.dumps(d))
+        print({k: v for k, v in d["smoke_check"].items() if k != "curve"}); print(d["smoke_check"]["curve"])
     elif len(sys.argv) > 1 and sys.argv[1] == "across":          # slow part, added to the existing file
         d = json.loads((OUT / "design.json").read_text())
         d["across_plans"] = across_plans()
