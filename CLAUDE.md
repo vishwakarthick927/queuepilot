@@ -6,7 +6,7 @@ Then read docs/BRIDGE.md (protocol + MESSAGES between machines) and docs/TASKS.m
 Before starting any task: `git pull`. After finishing any working feature: update the STATUS section below, commit, `git pull --rebase`, `git push`.
 
 ## CURRENT PLAN (15 Nov)
-Hero = **Crowd Twin** (crowd-crush early warning for control rooms). Read docs/CROWD.md before any work. Everything below is still true and stays as proof / fallback.
+Hero = **QueuePilot Design**: an AI design service that tells architects where to put fire exits (fewer exits, same safety, panic included), built on a **PG-GNN** (physics-guided graph neural network). **Read docs/BUILD.md before any work: it is the plan of record** (model, data, screen, tasks M1–M5 / W1–W4, contract, checkpoints). Start prompts for both machines: docs/PROMPTS.md. Constraints: docs/CONSTRAINTS.md. docs/CROWD.md = story, facts, Q&A. Everything below is still true and stays as proof / fallback.
 
 ## Event
 ZeroHour hackathon, Shunya, PES University, 14–15 Nov 2026. Team "Counter Intelligence". Track 3: Optimization, Graph Theory & Intelligent Systems.
@@ -74,8 +74,8 @@ REAL RESULTS (data/anonymous_bank_results.json, 183 train → 123 test days, 3,9
 | api/ | Main machine | FastAPI. `uvicorn api.main:app --reload` from repo root |
 | frontend/ | Windows machine (teammate) | React dashboard |
 | docs/CONSTRAINTS.md | Teammate 3 / anyone | Log every constraint verbatim |
-| data/ | WIN downloads, MAIN analyses | Real datasets, see data/README.md |
-| research/ | Windows machine | Standalone PyTorch research MVP (R1). Imports nothing from engine/. |
+| data/ | WIN downloads, MAIN analyses | Real datasets, see data/README.md. data/design/ = MAIN-owned plan graphs + design.json |
+| research/ | Windows machine | PyTorch models (R1, flood, golden, design/ PG-GNN). research/design may call engine.design_data / engine.evac (read-only use). |
 | docs/BRIDGE.md, docs/TASKS.md | Shared | Append only; protocol in BRIDGE.md |
 Only edit folders you own. Need a change elsewhere? Write it under REQUESTS below and push.
 
@@ -109,6 +109,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 15 Nov 10:20 [MAIN] — Judges' constraints 1+2 → new plan of record docs/BUILD.md: QueuePilot Design (exit placement for architects) on a PG-GNN. Tasks M1–M5 (MAIN: plan generator, detailed evacuation simulator, dataset, design search, verify) and W1–W4 (WIN: PG-GNN, recommend, Design Studio page). C1–C6 / W-C1–W-C5 superseded. Start prompts in docs/PROMPTS.md. Nothing built yet; waiting for the user to start both machines.
 - 15 Nov 09:30 [WIN] — ACK Crowd Twin (MAIN = captain, its plan is final). Claimed W-C1..W-C4. Starting W-C1 (research/crowd/) against contract v0.
 - 15 Nov 09:00 [MAIN] — FINAL PLAN per user: CROWD TWIN is the hero (docs/CROWD.md = plan of record: pitch, MVP screen, numbers, tasks C1–C4 / W-C1–W-C4, contract v0, checkpoints, Q&A). Planning only, nothing built yet. Flood / Golden Hour / sectors = fallback + backup slide. BRIDGE protocol rules 7–11 added.
 - 14 Nov 22:50 [MAIN] — Synced: docs/PAPER.md (paper summary + mapping incl. Golden Hour and Flood + real bank results). realdata glob restricted to *.txt/*.csv/*.tsv (WIN request). Current hero per user: Flood disaster twin (WIN); Golden Hour + sectors = proof of generality.

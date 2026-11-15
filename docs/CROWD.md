@@ -1,3 +1,5 @@
+> SCOPE SUPERSEDED 15 Nov 10:20 by docs/BUILD.md (judges' constraints: PG-GNN + exit design for architects). Story, facts list and Q&A below still apply; the control-room screen is a stretch goal.
+
 # QueuePilot Crowd Twin — THE plan (v6, 15 Nov 09:00, MAIN, approved by the user)
 
 This replaces docs/PLAN.md as the plan of record. Flood twin, Golden Hour, EV and sectors stay in the repo as fallback and one backup slide. Nothing here is built yet: this file is the spec both machines build from.

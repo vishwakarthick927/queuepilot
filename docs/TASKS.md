@@ -47,4 +47,14 @@
 | C5 | CONSTRAINT 1 (docs/CONSTRAINTS.md): exit-design optimiser in engine/crowd.py. Input: floor graph + candidate exit positions + fire scenarios. Output: fewest exits whose clearance time ≤ safe limit in every scenario incl. loss of any one exit; min-cut says "widen this door" vs "add an exit". Export data/crowd/design.json | MAIN | Todo (waiting for user go) |
 | W-C5 | CONSTRAINT 1 view: "Design" tab: floor plan, candidate exits, slider "number of exits" vs clearance time curve, chosen layout vs rule-of-thumb layout, space freed | WIN (proposed) | Todo |
 | C6 | Panic + exit familiarity model (softmax exit choice, herding, compliance, density-dependent door throughput); design search (C5) scored under panic, not ideal behaviour; export exit_share | MAIN | Todo (waiting for user go) |
+| — | **QueuePilot Design sprint (docs/BUILD.md is the plan of record, 15 Nov 10:20). C1–C6 and W-C1–W-C5 above are SUPERSEDED.** | — | — |
+| M1 | engine/plans.py: floor-plan generator → graph; data/design/demo_plan.json. Push first, post keys. | MAIN | Todo |
+| M2 | engine/evac.py: detailed evacuation simulator (panic, familiarity, herding, door jam, fire closes edges) + tests | MAIN | Todo |
+| M3 | python -m engine.design_data → train.npz (gitignored) + sample.npz + plans.json | MAIN | Todo |
+| M4 | engine/design.py: truth ranking of layouts, rule-of-thumb layout, max-flow bound, min-cut, code-minimum check → data/design/design.json (+ animation frames) | MAIN | Todo |
+| M5 | verify entry point: re-check given layouts in the detailed simulator | MAIN | Todo |
+| W1 | research/design/pggnn.py: physics / GNN only / PG-GNN, train, test on unseen plans → results.json | WIN (proposed) | Todo |
+| W2 | research/design/recommend.py: screen all layouts with PG-GNN, candidate value scores, verify top 5 via M5 → recommend.json | WIN (proposed) | Todo |
+| W3 | frontend/src/design/: Design Studio page (new default route) | WIN (proposed) | Todo |
+| W4 | Side-by-side evacuation animation, model drawer, polish | WIN (proposed) | Todo |
 
