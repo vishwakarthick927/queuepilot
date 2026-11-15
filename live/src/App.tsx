@@ -123,11 +123,18 @@ export default function App() {
           onZoom={() => setPlaza(true)} />
         {crushed && (
           <div className="stamp danger">
-            <b>DANGER</b>
+            <b>{mode === 'side' ? 'CRUSH RISK' : 'DANGER'}</b>
             <span>{venue.today.worst_zone} above {venue.danger_density} people per m² from {fmt1(venue.today.danger_at_min)} min</span>
           </div>
         )}
-        {withPlan && f >= alarmF && (
+        {/* side by side: at the same danger minute, the plan side is stamped too (from stays_below_danger) */}
+        {withPlan && mode === 'side' && f >= dangerF && venue.with_queuepilot.stays_below_danger && (
+          <div className="stamp safe">
+            <b>BELOW DANGER LINE</b>
+            <span>{venue.today.worst_zone} at {fmt1(densityAt(r, f)[venue.zones.findIndex((z) => z.name === venue.today.worst_zone)])} people per m²</span>
+          </div>
+        )}
+        {withPlan && mode !== 'side' && f >= alarmF && (
           <div className="stamp safe">
             <b>{venue.with_queuepilot.stays_below_danger ? 'DANGER AVOIDED' : 'PLAN RUNNING'}</b>
             <span>peak {fmt1(venue.with_queuepilot.peak_density)} people per m²</span>
@@ -173,6 +180,11 @@ export default function App() {
               Alarm <b className="num qp">{fmt1(venue.forecast.warning_min)} minutes</b> before the crush.
               Peak crowd <b className="num">{fmt1(venue.today.peak_density)}</b> → <b className="num qp">{fmt1(venue.with_queuepilot.peak_density)}</b> people per m².
             </p>
+            <dl className="story">
+              <dt>What went wrong</dt><dd>{venue.note.replace(/^Hidden problem:\s*/i, '').replace(/^./, (c) => c.toUpperCase())}</dd>
+              <dt className="qp">What QueuePilot did</dt>
+              <dd>{venue.actions.filter((a) => a.chosen).map((a) => a.label).join(' · ')}, at {fmt1(venue.forecast.alarm_at_min)} min.</dd>
+            </dl>
           </div>
           <div className={mode === 'side' ? 'stage split' : 'stage'}>
             {mode === 'side' ? <>{pane(false)}{pane(true)}</> : pane(planOn)}

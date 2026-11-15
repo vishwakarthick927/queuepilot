@@ -82,7 +82,7 @@ export default function VenueMap({ venue, density, openGates, flowing, learned, 
             role={zoom ? 'button' : undefined} aria-label={zoom ? `Open the grid inside ${q.name}` : undefined}>
             <rect x={q.x - q.w / 2} y={q.y - q.h / 2} width={q.w} height={q.h} rx={7} fill={densityColor(d, danger)} />
             {zoom && (
-              <g className="zoom-tag" transform={`translate(${q.x - q.w / 2 + 7}, ${q.y + q.h / 2 - 16})`}>
+              <g className="zoom-tag" transform={`translate(${q.x - q.w / 2}, ${q.y + q.h / 2 + 4})`}>
                 <rect x={0} y={0} width={62} height={11} rx={2} />
                 <text x={31} y={8} textAnchor="middle">CRUSH POINTS ↗</text>
               </g>

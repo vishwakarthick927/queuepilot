@@ -367,3 +367,29 @@ kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--li
 .cstat b { font-size: 16px; color: var(--ink); }
 .cview.accent .cstat b { color: var(--qp); }
 .cstat span { color: var(--faint); }.cstat { white-space: nowrap; }
+
+/* ---------- v3 (b): typeset physics ---------- */
+.f-section { margin: 4px 0 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--qp); }
+.f-section span { margin-left: 10px; letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--faint); }
+.f-cite { margin-left: 10px; font-size: 11px; font-weight: 400; color: var(--faint); font-family: var(--font-mono); }
+.f-math { font-family: inherit; font-style: normal; font-size: 15px; padding: 2px 14px; }
+.f-math .katex-display { margin: 8px 0; }
+.f-math .katex { font-size: 1.12em; color: var(--ink); }
+.f-const { margin: -4px 0 4px 42px; font-size: 12px; color: var(--faint); }
+/* ---------- v3 (d)+(e): warning band, story lines, PG-GNN forecast ---------- */
+.band { position: absolute; top: 0; bottom: 0; background: rgba(61, 220, 132, 0.12); border-left: 0; pointer-events: none; }
+.gap { border: 0; height: auto; top: 58px; }
+.gap span { top: 0; }
+.tl-gnn { fill: none; stroke: #e6edf3; stroke-width: 1.6; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.tl-legend { position: absolute; right: 0; top: -19px; display: flex; gap: 16px; font-size: 11px; color: var(--dim); white-space: nowrap; }
+.tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tl-legend i { display: inline-block; width: 18px; height: 0; border-top: 1.5px solid var(--today); opacity: 0.8; }
+.tl-legend i.lg-gnn { border-top: 1.6px dashed var(--ink); opacity: 1; }
+.story { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; font-size: 13px; }
+.story dt { color: var(--faint); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 2px; }
+.story dt.qp { color: var(--qp); }
+.story dd { margin: 0; color: var(--dim); }.tl-legend { position: static; justify-content: flex-end; margin-top: -2px; }
+.timeline { padding-bottom: 8px; }
+.stage.split .stamp { top: 0; left: auto; right: 0; flex-direction: row; align-items: baseline; gap: 10px; padding: 3px 10px; }
+.stage.split .stamp b { font-size: 12px; }
+.stage.split .stamp span { font-size: 11px; }
