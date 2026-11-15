@@ -20,6 +20,8 @@ type Props = {
   value?: Record<number, number>       // candidate id -> value score (marker size)
   compact?: boolean
   ours?: boolean                       // green = QueuePilot's exits; white = any other layout
+  onPick?: (id: number) => void        // click an exit position to place / remove an exit
+  tags?: Record<number, string>        // short label next to a built exit, e.g. "1  Exit here"
 }
 
 // One sequential scale for density, single hue (amber), dark = empty to light = crowded, same everywhere.
@@ -30,7 +32,7 @@ export function densityColor(d: number) {
   return `rgb(${lo.map((v, i) => Math.round(v + (hi[i] - v) * Math.sqrt(t))).join(',')})`
 }
 
-export default function PlanView({ plan, exits, blocked = null, people, fireNode, closed = [], minCut = [], value = {}, compact, ours = true }: Props) {
+export default function PlanView({ plan, exits, blocked = null, people, fireNode, closed = [], minCut = [], value = {}, compact, ours = true, onPick, tags = {} }: Props) {
   const hatch = useId()
   const N = plan.nodes
   const xs = N.map(n => n.x), ys = N.map(n => n.y)
@@ -84,10 +86,7 @@ export default function PlanView({ plan, exits, blocked = null, people, fireNode
             <text x={n.x} y={n.y} fontSize={1.7} textAnchor="middle" dominantBaseline="central" className="num" fontWeight={600}
               fill={density(n.id) > 1.6 ? 'var(--color-bg)' : 'var(--color-ink)'}>{Math.round(people[n.id])}</text>
           ) : (
-            <text x={n.x} y={n.y} fontSize={1.05} textAnchor="middle" className="num">
-              <tspan x={n.x} dy="-0.2em" fill="var(--color-ink)">{n.name?.replace('Room ', 'R') ?? `R${n.id}`}</tspan>
-              <tspan x={n.x} dy="1.35em" fill="var(--color-dim)">{Math.round(n.area_m2)} m²</tspan>
-            </text>
+            <text x={n.x} y={n.y} fontSize={1.1} textAnchor="middle" dominantBaseline="central" fill="var(--color-dim)">{n.name ?? `Room ${n.id}`}</text>
           )}
         </g>
       ))}
@@ -118,13 +117,22 @@ export default function PlanView({ plan, exits, blocked = null, people, fireNode
       {plan.candidates.map(c => {
         const n = N[c.node], at = N[c.attach_to], on = built.has(c.id)
         const r = 1.0 + 1.1 * Math.abs(value[c.id] ?? 0) / maxVal
+        const front = c.id === plan.main_entrance
+        const pick = onPick && !front ? () => onPick(c.id) : undefined
+        const out = { x: n.x - at.x, y: n.y - at.y }                     // which side of the building the exit is on
+        const tx = n.x, ty = n.y + (out.y < 0 ? -2.6 : 3.3)              // tag above exits on the top wall, else below
+        const anchor = 'middle'
         return (
-          <g key={c.id}>
+          <g key={c.id} onClick={pick} className={pick ? 'cursor-pointer' : undefined} role={pick ? 'button' : undefined}
+            aria-label={pick ? `${on ? 'Remove' : 'Place'} exit ${exitLabel(c.id)}` : undefined}>
+            {pick && <circle cx={n.x} cy={n.y} r={2.6} fill="transparent" />}
             {on && <line x1={at.x} y1={at.y} x2={n.x} y2={n.y} stroke={ex} strokeWidth={c.width_m / 3} />}
             <circle cx={n.x} cy={n.y} r={r} fill={on ? ex : 'var(--color-bg)'}
               stroke={on ? ex : 'var(--color-faint)'} strokeWidth="0.15" strokeDasharray={on ? undefined : '0.45 0.35'} />
             <text x={n.x} y={n.y} fontSize={compact ? 1.25 : 1.05} textAnchor="middle" dominantBaseline="central" fontWeight={600}
-              fill={on ? 'var(--color-bg)' : 'var(--color-faint)'} className="num">{exitLabel(c.id)}</text>
+              fill={on ? 'var(--color-bg)' : 'var(--color-faint)'} className="num">{tags[c.id]?.split(' ')[0] ?? exitLabel(c.id)}</text>
+            {front && !compact && <text x={tx} y={ty} fontSize={1.2} textAnchor={anchor} fill="var(--color-dim)">Front door</text>}
+            {tags[c.id] && !front && <text x={tx} y={ty} fontSize={1.3} textAnchor={anchor} fontWeight={600} fill={ex}>Exit here</text>}
             {blocked === c.id && (
               <g stroke="var(--color-alert)" strokeWidth="0.45" strokeLinecap="round">
                 <line x1={n.x - r - 0.4} y1={n.y - r - 0.4} x2={n.x + r + 0.4} y2={n.y + r + 0.4} />
