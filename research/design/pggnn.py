@@ -22,8 +22,8 @@ predicts the change in people directly, no physics), "pggnn" (ours). Trained by 
 and backpropagating through it, like research/flood/water.py. Truth = MAIN's detailed simulator (engine/evac.py),
 whose hidden rules (exit choice by familiarity + herding, doors jamming under panic) the models are never told.
 
-    python -m research.design.pggnn --quick     # makes its own runs with engine.evac (no dataset file needed)
-    python -m research.design.pggnn             # MAIN's dataset data/design/train.npz (engine.design_data)
+    python -m engine.design_data                               # once: MAIN's 1,600 runs -> data/design/train.npz
+    python -m research.design.pggnn --baselines                # trains all three, writes results.json + pggnn.pt
 """
 import argparse
 import json
@@ -42,6 +42,7 @@ HIDDEN = 32
 ROUNDS = 3
 MIN_SPEED = 0.15
 KINDS = ["room", "corridor", "stair", "exit"]
+ROUTE_KEYS = ("near", "fam", "via", "phys", "famdoor", "extra", "famt")
 torch.set_num_threads(4)
 
 
@@ -100,10 +101,15 @@ class Graph:
                 fam[d] = max(fam[d], self.fam[k])
                 via[d] = min(via[d], dist[i, k])
         near = dist.min(1) if dist.shape[1] else np.full(self.n, np.inf)
+        famdoor, extra, famt = np.zeros(D), np.zeros(self.n), np.zeros(self.n)
         for i in range(self.n):
             if np.isfinite(near[i]) and near[i] > 0:
                 phys[hop[i, int(np.argmin(dist[i]))]] = 1.0
-        return dict(near=near, fam=fam, via=via, phys=phys)
+                # channel 1: the most familiar exit this node can still reach, and the door toward it
+                k = max((k for k in range(len(self.exit_nodes)) if np.isfinite(dist[i, k])), key=lambda k: (self.fam[k], -dist[i, k]))
+                famdoor[hop[i, k]] = 1.0
+                extra[i], famt[i] = dist[i, k] - near[i], self.fam[k]
+        return dict(near=near, fam=fam, via=via, phys=phys, famdoor=famdoor, extra=extra, famt=famt)
 
     @staticmethod
     def batch(gs):
@@ -118,7 +124,7 @@ class Graph:
         b.n, b.dt, b.sizes = int(sum(g.n for g in gs)), gs[0].dt, [g.n for g in gs]
         b.max_density, b.flow_per_m, b.walk = gs[0].max_density, gs[0].flow_per_m, gs[0].walk
         b.stages = sorted({s for g in gs for s in g.stages})
-        b.route = {s: {k: np.concatenate([g.route_at(s)[k] for g in gs]) for k in ("near", "fam", "via", "phys")} for s in b.stages}
+        b.route = {s: {k: np.concatenate([g.route_at(s)[k] for g in gs]) for k in ROUTE_KEYS} for s in b.stages}
         b.torch()
         return b
 
@@ -144,28 +150,50 @@ class Graph:
 
 
 # ---------------------------------------------------------------- the physics (shared by physics + pggnn)
-def physics_step(g, people, share, eff, open_):
-    """One time step of conservation of people. share, eff: one number per directed door."""
-    density = people / g.t_area * (1 - g.t_exit)
+def walk_share(g, total):
+    """Share of a node's people who reach the next door this step: speed x dt / door distance, at most 1.
+    People walk slower in a crowd."""
+    density = total / g.t_area * (1 - g.t_exit)
     speed = g.walk * torch.clamp(1 - density / g.max_density, MIN_SPEED, 1.0)
-    walk = torch.clamp(speed[g.t_src] * g.dt / g.t_len, max=1.0)
-    want = people[g.t_src] * share * walk * open_                     # who wants to go through this door now
-    both = want + want[g.t_pair]                                      # both directions share the door
-    flow = want * torch.clamp(g.t_cap_door * eff / (both + 1e-9), max=1.0)
-    incoming = torch.zeros(g.n).index_add(0, g.t_dst, flow)
-    free = torch.relu(g.t_cap_people - people)                        # room law: space left in j
-    flow = flow * torch.clamp(free / (incoming + 1e-9), max=1.0)[g.t_dst]
-    out = torch.zeros(g.n).index_add(0, g.t_src, flow)
-    inn = torch.zeros(g.n).index_add(0, g.t_dst, flow)
-    return people - out + inn
+    return torch.clamp(speed[g.t_src] * g.dt / g.t_len, max=1.0)
+
+
+def door_demand(want):
+    """People pushing on each door from both sides this step (both directions share the door)."""
+    total = sum(want)
+    return total + total[torch.arange(len(total)) ^ 1]
+
+
+def move(g, people, want, eff):
+    """Door law + room law + conservation, for one or more groups of people (channels).
+    people: list of per-node counts, want: list of per-door wishes (same order), eff: door efficiency in [0, 1]."""
+    both = door_demand(want)
+    door = torch.clamp(g.t_cap_door * eff / (both + 1e-9), max=1.0)       # door law
+    flows = [w * door for w in want]
+    incoming = torch.zeros(g.n).index_add(0, g.t_dst, sum(flows))
+    total = sum(people)
+    room = torch.clamp(torch.relu(g.t_cap_people - total) / (incoming + 1e-9), max=1.0)[g.t_dst]   # room law
+    out = []
+    for p, f in zip(people, flows):
+        f = f * room
+        out.append(p - torch.zeros(g.n).index_add(0, g.t_src, f) + torch.zeros(g.n).index_add(0, g.t_dst, f))
+    return out                                                            # conservation: what leaves i arrives at j
+
+
+def physics_step(g, people, share, eff, open_):
+    """One time step for a single group of people. share, eff: one number per directed door."""
+    want = people[g.t_src] * share * walk_share(g, people) * open_
+    return move(g, [people], [want], eff)[0]
 
 
 # ---------------------------------------------------------------- the GNN (message passing by hand)
 def static_node(g, s):
-    """The fixed part of what a node knows at fire stage s: size, type, distance to an exit, fire, panic."""
+    """The fixed part of what a node knows at fire stage s: size, type, distance to the nearest exit,
+    how much further the most familiar exit is and how familiar it is, fire, panic."""
+    r = g.route[s]
     kind = np.eye(4)[g.kind]
-    near = np.minimum(np.nan_to_num(g.route[s]["near"], posinf=300.0), 300) / 50
-    x = np.column_stack([np.log(g.area) / 5, kind, near, g.fire, g.panic])
+    near = np.minimum(np.nan_to_num(r["near"], posinf=300.0), 300) / 50
+    x = np.column_stack([np.log(g.area) / 5, kind, near, np.minimum(r["extra"], 300) / 50, r["famt"], g.fire, g.panic])
     return torch.tensor(x, dtype=torch.float32)
 
 
@@ -188,7 +216,7 @@ def edge_features(g, step, open_):
     return g.cache[g.stage(step)][2]
 
 
-N_NODE, N_EDGE = 9, 6
+N_NODE, N_EDGE = 11, 6
 
 
 def mlp(i, o):
@@ -222,28 +250,58 @@ def masked_softmax(logits, src, n, open_):
 
 
 class PGGNN(nn.Module):
-    """Ours: the physics step, with a learned door efficiency (sigmoid) and learned shares (softmax)."""
+    """Ours: physics does the walking; the network learns only bounded terms.
+      channels=True  (fix 1)  people carry a destination: channel 0 heads for the NEAREST exit, channel 1 for the
+                              MOST FAMILIAR one. Learned: the share of each room in channel 1 (sigmoid) and how
+                              fast people re-decide (a rate in [0, 0.15]). Otherwise: learned door shares (softmax).
+      ratio=True     (fix 2)  the door-efficiency head sees demand / capacity and panic, the two things a jam needs.
+    Splits sum to the node's people and efficiency <= 1, so nobody is created or lost."""
 
-    def __init__(self):
+    def __init__(self, channels=True, ratio=True):
         super().__init__()
+        self.channels, self.ratio = channels, ratio
         self.mp = MessagePassing()
-        self.eff_head = mlp(2 * HIDDEN + N_EDGE, 1)
+        self.eff_head = mlp(2 * HIDDEN + N_EDGE + 2, 1)
         self.share_head = mlp(2 * HIDDEN + N_EDGE, 1)
+        self.choice_head = mlp(HIDDEN + N_NODE, 1)
+        self.rethink = nn.Parameter(torch.tensor(-1.0))
         nn.init.constant_(self.eff_head[-1].bias, 3.0)              # start near "doors work as designed"
 
-    def terms(self, g, people, step, open_):
-        """The two learned, bounded terms: door efficiency in [0, 1] and shares that sum to 1."""
-        h, e = self.mp(g, people, step, open_)
-        x = torch.cat([h[g.t_src], h[g.t_dst], e], 1)
-        eff = torch.sigmoid(self.eff_head(x)[:, 0])
-        # start from the textbook route (+6 on its door) and let the network move people off it
-        share = masked_softmax(self.share_head(x)[:, 0] + 6 * e[:, 2], g.t_src, g.n, open_)
-        return eff, share
+    def choice(self, g, h, total, step):
+        """Share of each node's people heading for the most familiar exit (learned, in [0, 1])."""
+        return torch.sigmoid(self.choice_head(torch.cat([h, node_features(g, total, step)], 1))[:, 0])
 
-    def step(self, g, people, step):
+    def init(self, g, people0):
+        if not self.channels:
+            return people0
+        h, _ = self.mp(g, people0, 0, g.open_at(0))
+        c = self.choice(g, h, people0, 0)
+        return torch.stack([people0 * (1 - c), people0 * c], 1)
+
+    @staticmethod
+    def total(state):
+        return state.sum(1) if state.dim() == 2 else state
+
+    def step(self, g, state, step):
         open_ = g.open_at(step)
-        eff, share = self.terms(g, people, step, open_)
-        return physics_step(g, people, share, eff, open_)
+        total = self.total(state)
+        h, e = self.mp(g, total, step, open_)
+        walk = walk_share(g, total) * open_
+        if self.channels:
+            c = self.choice(g, h, total, step)
+            x1 = state[:, 1] + 0.15 * torch.sigmoid(self.rethink) * (c * total - state[:, 1])   # some people re-decide
+            people = [total - x1, x1]
+            doors = [e[:, 2], torch.tensor(g.route_at(step)["famdoor"], dtype=torch.float32)]
+            want = [p[g.t_src] * d * walk for p, d in zip(people, doors)]
+        else:
+            x = torch.cat([h[g.t_src], h[g.t_dst], e], 1)
+            share = masked_softmax(self.share_head(x)[:, 0] + 6 * e[:, 2], g.t_src, g.n, open_)
+            people, want = [total], [total[g.t_src] * share * walk]
+        ratio = torch.clamp(door_demand(want) / g.t_cap_door, 0, 5) if self.ratio else torch.zeros(len(g.src))
+        panic = torch.tensor(g.panic, dtype=torch.float32)[g.t_src] if self.ratio else torch.zeros(len(g.src))
+        eff = torch.sigmoid(self.eff_head(torch.cat([h[g.t_src], h[g.t_dst], e, ratio[:, None], panic[:, None]], 1))[:, 0])
+        people = move(g, people, want, eff)
+        return torch.stack(people, 1) if self.channels else people[0]
 
 
 class GNNOnly(nn.Module):
@@ -269,11 +327,14 @@ class PhysicsOnly:
 
 
 def rollout(model, g, people, start, steps):
-    """Roll a model forward; returns people[step][node] (steps x n). Exit nodes keep everyone who left."""
+    """Roll a model forward from the starting crowd; returns people[step][node] (steps x n).
+    Exit nodes keep everyone who left through them."""
+    state = model.init(g, people) if hasattr(model, "init") else people
+    total = model.total if hasattr(model, "total") else (lambda s: s)
     out = []
     for k in range(steps):
-        people = model.step(g, people, start + k)
-        out.append(people)
+        state = model.step(g, state, start + k)
+        out.append(total(state))
     return torch.stack(out)
 
 
@@ -293,87 +354,77 @@ def clearance_steps(traj, g):
 
 
 # ---------------------------------------------------------------- data from MAIN's simulator
-def people_with_start(plan, people):
-    """Prepend the starting crowd to the simulator's people[step][node]."""
-    p0 = np.array([float(n["people0"]) for n in plan["nodes"]], dtype=np.float32)
-    people = np.asarray(people, dtype=np.float32).reshape(-1, len(p0))
-    return torch.tensor(np.vstack([p0[None], people]))
+def truth_table(plan, people, flow, steps, exits_built):
+    """One tensor per run, [steps + 1, nodes]: people in each room/corridor after each step (row 0 = the start),
+    and in each EXIT node the cumulative number of people who left through it (so it matches our exit nodes,
+    which keep everyone who arrives). Rows after the run ended: building empty, exit totals held."""
+    n, T = len(plan["nodes"]), 300
+    t = np.zeros((T + 1, n), np.float32)
+    t[0] = [nd["people0"] for nd in plan["nodes"]]
+    t[1:steps + 1] = people[:steps, :n]
+    for c in plan["candidates"]:
+        if c["id"] in exits_built:
+            e = next(i for i, ed in enumerate(plan["edges"]) if ed["candidate"] == c["id"])
+            out = np.cumsum(np.abs(flow[:T, e]))
+            t[1:, c["node"]] = np.concatenate([out[:steps], np.full(T - steps, out[steps - 1] if steps else 0)])
+    return torch.tensor(t)
 
 
-def sim_runs(seeds, per_plan, max_steps, rng):
-    """Make runs directly with engine.evac (the same simulator engine.design_data uses): random plans,
-    random layouts, fires, lost exits, panic 0..1."""
-    from engine import evac, plans
+def main_runs():
+    """MAIN's train.npz (engine.design_data): (graph, truth table, cleared step or None, is_test) per run."""
+    plans = json.loads((DATA / "train_plans.json").read_text())
+    z = np.load(DATA / "train.npz")
     runs = []
-    for seed in seeds:
-        plan = plans.make_plan(int(seed))
-        ids = [c["id"] for c in plan["candidates"] if c["id"] != plan["main_entrance"]]
-        for _ in range(per_plan):
-            exits = [plan["main_entrance"]] + [int(x) for x in rng.choice(ids, size=int(rng.integers(1, 5)), replace=False)]
-            fire = plan["fires"][int(rng.integers(len(plan["fires"])))] if rng.random() < 0.5 and plan["fires"] else None
-            lost = int(rng.choice(exits)) if fire is None and rng.random() < 0.3 else None
-            panic = float(rng.uniform(0, 1))
-            r = evac.simulate(plan, exits, fire=fire, panic=panic, lost_exit=lost, max_steps=max_steps)
-            runs.append((Graph(plan, exits, fire, panic, lost), people_with_start(plan, r["people"])))
+    for r in range(len(z["plan_index"])):
+        plan = plans[int(z["plan_index"][r])]
+        built = [c["id"] for k, c in enumerate(plan["candidates"]) if k < z["exits"].shape[1] and z["exits"][r, k]]
+        fire = plan["fires"][int(z["fire"][r])] if z["fire"][r] >= 0 else None
+        lost = int(z["lost_exit"][r]) if z["lost_exit"][r] >= 0 else None
+        g = Graph(plan, built, fire, float(z["panic"][r]), lost)
+        steps = int(z["steps"][r])
+        truth = truth_table(plan, z["people"][r], z["flow"][r], steps, built)
+        cleared = int(z["clearance_step"][r]) if z["clearance_step"][r] >= 0 else None
+        runs.append((g, truth, cleared, bool(z["is_test"][r])))
+    print(f"loaded {len(runs)} runs ({sum(r[3] for r in runs)} on held-out plans)", flush=True)
     return runs
 
 
-def main_runs(max_steps=300):
-    """Rows of MAIN's train.npz (or sample.npz) + plans.json, as (graph, people[step][node]) and plan index."""
-    plans = json.loads((DATA / "plans.json").read_text())
-    f = DATA / "train.npz" if (DATA / "train.npz").exists() else DATA / "sample.npz"
-    z = np.load(f, allow_pickle=True)
-    runs, plan_of = [], []
-    for r in range(len(z["plan_index"])):
-        plan = plans[int(z["plan_index"][r])]
-        fire = int(z["fire"][r]) if "fire" in z else -1
-        lost = int(z["lost_exit"][r]) if "lost_exit" in z and int(z["lost_exit"][r]) >= 0 else None
-        g = Graph(plan, int(z["exits"][r]), plan["fires"][fire] if fire >= 0 else None, float(z["panic"][r]), lost)
-        people = np.asarray(z["people"][r], dtype=np.float32)[:max_steps, :g.n]
-        runs.append((g, people_with_start(plan, people)))
-        plan_of.append(int(z["plan_index"][r]))
-    print(f"loaded {len(runs)} runs on {len(plans)} plans from {f.name}")
-    return runs, np.array(plan_of)
-
-
 # ---------------------------------------------------------------- training + test
-def train(model, runs, iters, horizon=40, lr=2e-3, batch=8):
-    """Pick runs and start times, roll the model forward `horizon` steps, match the simulator inside the building.
-    Runs in one batch share a start time, so the fire stage is right for all of them.
-    Loss = error per node + error in the number of people still inside (what decides the clearance time)."""
+def train(model, runs, iters, horizon=150, lr=2e-3, batch=8, pggnn=True):
+    """From the starting crowd, roll the model forward `horizon` steps and match the simulator (fix 3).
+    Loss (people / 10, squared): every room and corridor 1.0, people still inside 0.5,
+    cumulative people out through each exit 0.5 (this one checks WHICH exit people chose)."""
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters)
     r = np.random.default_rng(0)
     for i in range(iters):
-        t0 = int(r.integers(0, 100))
-        picks = [runs[int(k)] for k in r.integers(len(runs), size=4 * batch)]
-        picks = [(g, t) for g, t in picks if len(t) > t0 + horizon][:batch]
-        if not picks:
-            continue
-        b = Graph.batch([g for g, _ in picks])
-        p0 = torch.cat([t[t0] for _, t in picks])
-        target = torch.cat([t[t0 + 1:t0 + 1 + horizon] for _, t in picks], 1)
-        pred = rollout(model, b, p0, t0, horizon)
-        keep = 1 - b.t_exit
+        picks = [runs[int(k)] for k in r.integers(len(runs), size=batch)]
+        b = Graph.batch([g for g, *_ in picks])
+        truth = torch.cat([t[:horizon + 1] for _, t, *_ in picks], 1)
+        pred = rollout(model, b, truth[0], 0, horizon)
+        target, keep, ex = truth[1:], 1 - b.t_exit, b.t_exit
         node_err = ((((pred - target) * keep) / 10) ** 2).mean()
         inside_err = (((inside(pred, b) - inside(target, b)) / 10) ** 2).mean()
-        loss = node_err + 0.1 * inside_err
+        exit_err = ((((pred - target) * ex) / 10) ** 2).mean()
+        loss = node_err + 0.5 * inside_err + (0.5 * exit_err if pggnn else 0)
         opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step(); sched.step()
-        if i % 100 == 0:
+        if i % 50 == 0:
             print(f"    iter {i:4d}  loss {loss.item():.4f}", flush=True)
     return model
 
 
 @torch.no_grad()
-def test(model, runs, max_steps=300):
+def test(model, runs, max_steps=300, batch=32):
     """Full rollouts on floor plans never seen in training: clearance-time error and people created/lost."""
     errs, lost = [], []
-    for g, truth in runs:
-        pred = rollout(model, g, truth[0], 0, max_steps)
-        c_pred = clearance_steps(pred, g)[0]
-        c_true = len(truth) - 1 if len(truth) - 1 < max_steps else None    # MAIN's runs stop at clearance
-        errs.append(abs((c_pred or max_steps) - (c_true or max_steps)) * g.dt)
-        lost.append(float((pred.sum(1) - truth[0].sum()).abs().max()))
+    for s in range(0, len(runs), batch):
+        chunk = runs[s:s + batch]
+        b = Graph.batch([g for g, *_ in chunk])
+        start = torch.cat([t[0] for _, t, *_ in chunk])
+        pred = rollout(model, b, start, 0, max_steps)
+        for (g, t, cleared, _), c, part, p0 in zip(chunk, clearance_steps(pred, b), pred.split(b.sizes, 1), start.split(b.sizes)):
+            errs.append(abs((c or max_steps) - (cleared or max_steps)) * g.dt)
+            lost.append(float((part.sum(1) - p0.sum()).abs().max()))
     e = np.array(errs)
     return {"clearance_err_s": round(float(e.mean()), 1), "ci95": round(float(1.96 * e.std() / np.sqrt(len(e))), 1),
             "people_error": round(float(np.mean(lost)), 2), "runs": len(e)}
@@ -400,31 +451,35 @@ def sim_speed(n=20):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--quick", action="store_true", help="make runs with engine.evac instead of reading train.npz")
-    ap.add_argument("--iters", type=int, default=800)
+    ap.add_argument("--tag", default="", help="suffix for the output files (results_<tag>.json, pggnn_<tag>.pt)")
+    ap.add_argument("--no-channels", action="store_true", help="switch off fix 1 (destination channels)")
+    ap.add_argument("--no-ratio", action="store_true", help="switch off fix 2 (demand ratio into the efficiency head)")
+    ap.add_argument("--baselines", action="store_true", help="also train and test GNN only and physics only")
+    ap.add_argument("--iters", type=int, default=600)
+    ap.add_argument("--threads", type=int, default=4)
     a = ap.parse_args()
+    torch.set_num_threads(a.threads)
     torch.manual_seed(0)
-    if a.quick:
-        rng = np.random.default_rng(0)
-        train_runs = sim_runs(range(100, 200), 8, 300, rng)              # 100 plans for training
-        test_runs = sim_runs(range(900, 912), 6, 300, rng)               # 12 plans never seen in training
-    else:
-        runs, plan_of = main_runs()
-        unseen = plan_of % 5 == 0                                        # every 5th floor plan is never trained on
-        train_runs = [r for r, u in zip(runs, unseen) if not u]
-        test_runs = [r for r, u in zip(runs, unseen) if u]
-    models = {"physics": PhysicsOnly(), "gnn": GNNOnly(), "pggnn": PGGNN()}
-    for name in ("pggnn", "gnn"):
-        print("training", name, flush=True)
-        train(models[name], train_runs, a.iters)
+    runs = main_runs()
+    train_runs = [r for r in runs if not r[3]]
+    test_runs = [r for r in runs if r[3]]                                # 16 plans never seen in training
+    ours = PGGNN(channels=not a.no_channels, ratio=not a.no_ratio)
+    print("training pggnn", "channels" if ours.channels else "", "ratio" if ours.ratio else "", flush=True)
+    train(ours, train_runs, a.iters)
+    models = {"pggnn": ours}
+    if a.baselines:
+        print("training gnn only", flush=True)
+        models["gnn"] = train(GNNOnly(), train_runs, a.iters, pggnn=False)
+        models["physics"] = PhysicsOnly()
     res = {"models": {k: test(m, test_runs) for k, m in models.items()},
-           "speed": {"pggnn_per_s": speed(models["pggnn"], test_runs[0][0]), "simulator_per_s": sim_speed()},
-           "setup": {"source": "engine.evac runs made here (--quick)" if a.quick else "MAIN engine.design_data",
-                     "train_runs": len(train_runs), "test_runs": len(test_runs), "dt_s": 2, "max_steps": 300,
-                     "unseen": "test floor plans never appear in training", "simulated": True}}
-    print(json.dumps(res, indent=1))
-    (OUT / "results.json").write_text(json.dumps(res, indent=1))
-    torch.save(models["pggnn"].state_dict(), OUT / "pggnn.pt")
+           "speed": {"pggnn_per_s": speed(ours, test_runs[0][0]), "simulator_per_s": sim_speed()},
+           "setup": {"source": "MAIN engine.design_data (data/design/train.npz)", "train_runs": len(train_runs),
+                     "test_runs": len(test_runs), "dt_s": 2, "max_steps": 300, "channels": ours.channels, "ratio": ours.ratio,
+                     "unseen": "16 floor plans never seen in training", "simulated": True}}
+    print(json.dumps(res, indent=1), flush=True)
+    tag = f"_{a.tag}" if a.tag else ""
+    (OUT / f"results{tag}.json").write_text(json.dumps(res, indent=1))
+    torch.save(ours.state_dict(), OUT / f"pggnn{tag}.pt")
 
 
 if __name__ == "__main__":
