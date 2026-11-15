@@ -8,6 +8,8 @@ Before starting any task: `git pull`. After finishing any working feature: updat
 ## CURRENT PLAN (15 Nov)
 Hero = **QueuePilot Design**: an AI design service that tells architects where to put fire exits (fewer exits, same safety, panic included), built on a **PG-GNN** (physics-guided graph neural network). **Read docs/BUILD.md before any work: it is the plan of record** (model, data, screen, tasks M1–M5 / W1–W4, contract, checkpoints). Start prompts for both machines: docs/PROMPTS.md. Constraints: docs/CONSTRAINTS.md. docs/CROWD.md = story, facts, Q&A. Everything below is still true and stays as proof / fallback.
 
+**Second product (15 Nov afternoon): QueuePilot Live = stampede prevention control room. Spec: docs/STAMPEDE.md. Separate app `live/` on port 5174; QueuePilot Design stays on 5173.**
+
 ## Event
 ZeroHour hackathon, Shunya, PES University, 14–15 Nov 2026. Team "Counter Intelligence". Track 3: Optimization, Graph Theory & Intelligent Systems.
 Rounds: Day 1 development + mentor reviews (cut), Day 2 final coding + evaluation. Constraints are revealed progressively during the event.
@@ -109,6 +111,7 @@ GET /forecast → {"forecast_error": {"physics": 4.32, "data": 10.59, "hybrid": 
 For each constraint: what changed? which part? simplest fix? how do we show it works? Keep FCFS vs QueuePilot comparison working always.
 
 ## STATUS (update this — newest first, one line each)
+- 15 Nov 16:10 [MAIN] — QueuePilot Live (stampede prevention) engine + data: engine/crowd.py, data/crowd/{index,stadium,temple,station,ghat}.json, preview.png. Simulated: textbook never predicts danger; learning twin alarms 5.1 / 8.6 / 7.6 / 4.8 min early; peak density 5.2→2.35, 6.0→0.82, 4.6→0.90, 5.5→3.9 /m². Spec for WIN: docs/STAMPEDE.md (new app `live/`, port 5174). evac.simulate gained optional arrivals / gate_eff / open_at / guide (defaults unchanged; design results identical). 20 tests pass.
 - 15 Nov 15:45 [WIN] — Rounds 7+8: "Why this physics" section at ?physics=1 (Hamiltonian vs least action vs PG-GNN from mechanics.json), building switcher verified on all five. Waiting for user feedback.
 - 15 Nov 15:00 [WIN] — Rounds 5+6: PG-CNN (corridor block time error 0.6 s vs textbook 67.1 s vs CNN only 9.8 s; 0 smoke created), three-step strip, smoke scene, building switcher (5 buildings, honest per-building sentence). Screenshots docs/brief/design_*.png. Waiting for user feedback.
 - 15 Nov 14:40 [MAIN] — engine/mechanics.py: Hamiltonian / Lagrangian tested against ours on the same 320 held-out runs (simulated). Error in time to empty: Hamiltonian+friction 112.5 s, Hamiltonian (energy conserved) 81.5 s (−90.8 people in a room, 42.5% of movement away from exits), GNN only 51.7, least action 22.1, PG-GNN 4.7. Lagrange-multiplier exit search = same exits on all 5 buildings with 13–38 layouts instead of 127–511. data/design/mechanics.json + mechanics.png, reasons in docs/PHYSICS.md. 19 tests pass.

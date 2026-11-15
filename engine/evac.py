@@ -65,12 +65,19 @@ def exit_probabilities(dist, wait_s, known, share, w):
     return np.divide(p, s, out=np.zeros_like(p), where=s > 0)
 
 
-def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, record=True):
+def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, record=True,
+             arrivals=None, gate_eff=None, open_at=None, guide=None, jam=None):
     """Run one evacuation.
     exits      candidate ids that are built          fire   a fire dict from plan["fires"], or None
     lost_exit  a built candidate blocked from t=0    panic  0..1
     Returns people[step][node], flow[step][edge] (net a->b), evacuated[step], clearance_s (None if not cleared),
-    trapped (people who can reach no exit), exit_use {candidate id: people}."""
+    trapped (people who can reach no exit), exit_use {candidate id: people}.
+    Extra inputs used by the crowd (stampede) scenarios in engine/crowd.py; all default to "off":
+      arrivals {step: [(node, people)]}  people who arrive later      gate_eff {candidate: 0..1}  a gate that is partly shut
+      open_at {candidate: step}  a built gate that only opens then     guide {step: (share, {candidate: familiarity})}
+      jam  overrides the hidden door-jam constant (the forecaster passes 0: it does not know it)"""
+    arrivals, gate_eff, open_at, guide = arrivals or {}, gate_eff or {}, open_at or {}, guide or {}
+    jam_k = JAM if jam is None else jam
     nodes, edges, cands = plan["nodes"], plan["edges"], plan["candidates"]
     N, E, dt = len(nodes), len(edges), plan["dt_s"]
     built = [c for c in cands if c["id"] in set(exits)]
@@ -86,7 +93,11 @@ def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, r
     head[0:2 * E:2] = [e["b"] for e in edges]
     head[1:2 * E:2] = [e["a"] for e in edges]
     head[2 * E] = 0                                                # dummy "no move" edge
-    is_open = np.array([e["candidate"] is None or (e["candidate"] in set(exits) and e["candidate"] != lost_exit) for e in edges])
+    is_open = np.array([e["candidate"] is None or (e["candidate"] in set(exits) and e["candidate"] != lost_exit
+                                                   and open_at.get(e["candidate"], 0) <= 0) for e in edges])
+    for e_i, e in enumerate(edges):                                # a partly shut gate passes less
+        if e["candidate"] in gate_eff:
+            cap0[e_i] *= gate_eff[e["candidate"]]
     close_at = {c["edge"]: c["step"] for c in (fire["close"] if fire else [])}
     exit_edge = {c["id"]: next(i for i, e in enumerate(edges) if e["candidate"] == c["id"]) for c in built}
     exit_cap_s = np.array([cap0[exit_edge[c["id"]]] / dt for c in built])
@@ -95,7 +106,7 @@ def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, r
 
     dist, hop = shortest_paths(N, edges, is_open, exit_nodes)
     people0 = np.array([float(n["people0"]) for n in nodes])
-    total = people0.sum()
+    total = people0.sum() + sum(n for lst in arrivals.values() for _, n in lst)
     P = people0[:, None] * exit_probabilities(dist, np.zeros(K), known, np.zeros(K), w)   # P[node, exit]
     P[:, 0] += people0 - P.sum(1)                                  # people with no reachable exit wait in column 0
     out_per_exit = np.zeros(K)
@@ -106,9 +117,14 @@ def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, r
     for t in range(max_steps):
         # FIRE: close edges, re-route
         closing = [e for e, s in close_at.items() if s == t and is_open[e]]
-        if closing:
+        opening = [exit_edge[c] for c, s in open_at.items() if s == t and c in exit_edge and c != lost_exit]
+        if closing or opening:
             is_open[closing] = False
+            is_open[opening] = True
             dist, hop = shortest_paths(N, edges, is_open, exit_nodes)
+        if t in guide:                                              # announcements / signs: people learn about other gates
+            for c, fam in guide[t][1].items():
+                known[[b["id"] for b in built].index(c)] = fam
         n = P.sum(1)
 
         # CHOOSE: some people reconsider; anyone heading for an exit they can no longer reach must re-choose
@@ -118,8 +134,12 @@ def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, r
         can_choose = prob.sum(1) > 0
         stuck = np.where(np.isfinite(dist), 0.0, P)                # heading for an unreachable exit
         stuck[~can_choose] = 0.0
-        moving_on = w["rethink"] * (P - stuck) * can_choose[:, None]
+        rethink = max(w["rethink"], guide[t][0]) if t in guide else w["rethink"]
+        moving_on = rethink * (P - stuck) * can_choose[:, None]
         P = P - stuck - moving_on + (stuck.sum(1) + moving_on.sum(1))[:, None] * prob
+        for node, n_new in arrivals.get(t, []):                     # late arrivals pick a gate like everyone else
+            P[node] += n_new * prob[node] if can_choose[node] else n_new * (np.arange(K) == 0)
+        n = P.sum(1)
 
         # MOVE: how many WANT to step along their next edge this step
         speed = plan["walk_speed_m_s"] * np.clip(1 - (n / np.maximum(area, 1e-9)) / plan["max_density"], MIN_SPEED, 1)
@@ -130,7 +150,7 @@ def simulate(plan, exits, fire=None, panic=0.0, lost_exit=None, max_steps=300, r
         # DOORS: both directions share the door; HIDDEN jam under panic
         demand = np.bincount(hop_e.ravel(), weights=want.ravel(), minlength=2 * E + 1)[:2 * E]
         both = demand[0::2] + demand[1::2]
-        jam = 1 - JAM * panic * np.clip((both / cap0 - 1) / 2, 0, 1)
+        jam = 1 - jam_k * panic * np.clip((both / np.maximum(cap0, 1e-9) - 1) / 2, 0, 1)
         cap = cap0 * jam * is_open
         door = np.append(np.repeat(np.minimum(1.0, cap / np.maximum(both, 1e-9)), 2), 0.0)
         go = want * door[hop_e]

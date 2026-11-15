@@ -1,0 +1,66 @@
+[
+ {
+  "id": "stadium",
+  "name": "Stadium victory celebration",
+  "place": "City cricket stadium, free-entry celebration",
+  "inspired_by": {
+   "event": "Bengaluru, M. Chinnaswamy Stadium",
+   "date": "4 June 2025",
+   "toll": "11 dead, 33 injured",
+   "what": "Fans gathered at the gates for a victory celebration; the crush was at a gate."
+  },
+  "file": "stadium.json",
+  "total_people": 5000,
+  "warning_min": 5.1,
+  "peak_today": 5.21,
+  "peak_with": 2.35
+ },
+ {
+  "id": "temple",
+  "name": "Temple token counters",
+  "place": "Darshan token distribution centre",
+  "inspired_by": {
+   "event": "Tirupati, token centres for Vaikunta Dwara Darshanam",
+   "date": "8 January 2025",
+   "toll": "6 dead",
+   "what": "Devotees waiting for darshan tokens surged when a gate was opened."
+  },
+  "file": "temple.json",
+  "total_people": 2500,
+  "warning_min": 8.6,
+  "peak_today": 5.98,
+  "peak_with": 0.82
+ },
+ {
+  "id": "station",
+  "name": "Railway station, festival rush",
+  "place": "Major terminus, special-train night",
+  "inspired_by": {
+   "event": "New Delhi Railway Station",
+   "date": "15 February 2025",
+   "toll": "18 dead",
+   "what": "Crowds heading for festival trains surged on the stairs and platforms."
+  },
+  "file": "station.json",
+  "total_people": 3200,
+  "warning_min": 7.6,
+  "peak_today": 4.58,
+  "peak_with": 0.9
+ },
+ {
+  "id": "ghat",
+  "name": "Riverbank bathing day",
+  "place": "Festival ghats on the main bathing day",
+  "inspired_by": {
+   "event": "Prayagraj, Maha Kumbh, Mauni Amavasya",
+   "date": "29 January 2025",
+   "toll": "at least 30 dead, about 60 injured",
+   "what": "A pre-dawn surge toward the main bathing point broke through barricades."
+  },
+  "file": "ghat.json",
+  "total_people": 9000,
+  "warning_min": 4.8,
+  "peak_today": 5.45,
+  "peak_with": 3.9
+ }
+]

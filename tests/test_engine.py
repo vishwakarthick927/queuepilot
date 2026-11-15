@@ -157,6 +157,14 @@ def test_hamiltonian_crowd_breaks_positivity_and_sloshes():
     assert mechanics.least_action_run(p, [0, 1, 3], None, None)["min_people"] >= -1e-6
 
 
+def test_crowd_venue_alarm_comes_before_danger_and_plan_is_safe():
+    from engine import crowd
+    plan, sched = crowd.venues()[1]                      # temple token counters
+    a = crowd.analyse(plan, sched)
+    assert a["today"]["danger_at_min"] is not None and a["forecast"]["warning_min"] > 0
+    assert a["with_queuepilot"]["peak_density"] < crowd.DANGER < a["today"]["peak_density"]
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):
