@@ -17,3 +17,22 @@ Run `git pull --rebase` and read the newest MAIN→WIN message in docs/BRIDGE.md
 4. **Demo path works by keyboard or one click each:** load plan → rule-of-thumb layout fails under panic → Recommend → ours passes with fewer exits → side by side → model drawer (unseen plans, conservation, agreement) → panic buttons (Calm / Uneasy / Panic) change the verdict. No dead buttons, no console errors, no layout shift.
 5. **Then STOP.** Take screenshots of the main screen, the side-by-side and the model drawer into docs/brief/ (design_main.png, design_compare.png, design_model.png), commit, push, post one MESSAGE listing what is done, what is weak, and the real numbers. Wait for the user's feedback before building anything else.
 
+## WIN, round 4 (15 Nov): SIMPLIFY the page. This replaces step 3 and 4 of round 3.
+User feedback: the page throws too much data. It must say ONE thing, in plain words: **"More fire exits do not make a building safer. The right exits do. QueuePilot shows the architect exactly where to put them."** Rebuild the main screen around that. Run `git pull --rebase` first.
+
+**Main screen: only these five things.**
+1. Headline, plain: "More exits don't make a building safer. The right ones do." One line under it: "QueuePilot tells architects where to place fire exits, so a building needs fewer of them and still empties in time."
+2. **The floor plan, as large as possible.** Possible exit positions shown as quiet outlines.
+3. **Try it yourself, then let QueuePilot do it.** The viewer can click exit positions to place exits (the front door is always there). Each click instantly shows one verdict from `design.json by_panic["0.8"].layouts` (every layout is precomputed there, look it up by its `exits` list): a green "Everyone out in time" or a red "Not safe: people still inside when time runs out". Then one button: **"Find the best exits"**: QueuePilot's exits appear on the plan, numbered, each with a short tag "Exit here".
+4. **One sentence result**, built from the data, no table: "3 exits placed by QueuePilot get everyone out in 2 min 26 s. Spread evenly, you would need 5." (numbers from `chosen`, `rule_of_thumb`, `by_panic["0.8"]`.)
+5. **Play the evacuation, side by side:** left "3 exits, spread evenly", right "3 exits, placed by QueuePilot" (the `frames`). Same clock. One big counter on each: "people still inside". When the clock hits the safe limit, freeze a beat and stamp each side: left "75 still inside" (read from frames, do not type it), right "Everyone out". That moment is the whole pitch.
+At most THREE numbers visible outside the animation: exits needed (3 instead of 5), time to get everyone out, floor space saved (m²). Nothing else.
+
+**Plain words everywhere.** "time to get everyone out", not "worst-case clearance". "spread evenly", not "rule of thumb". "panicked crowd", not "panic 0.8". "exit positions", not "candidates". "the door everyone knows", not "familiarity". No "PG-GNN", "max-flow", "min-cut", "CI", "held-out" on the main screen.
+
+**Everything else goes behind one quiet button, "How it works" (for judges' questions only):** three short blocks, each one picture + two sentences: (a) "Physics we know": people can't appear or vanish, a door only lets so many through. (b) "What the AI learns": which exit a panicked crowd runs to, and how badly doors jam (this is the PG-GNN; show the three-model comparison and the real numbers here, once, small). (c) "How we check": the best layouts are re-run in a detailed crowd simulation; the 20-plan comparison lives here too. The panic levels, min-cut, max-flow bound, layout tables and model metrics all move here or are removed.
+
+**Honesty, one quiet line at the bottom of the main screen:** "Crowd behaviour is simulated. QueuePilot never recommends fewer exits than the building code allows." Do NOT write "real data" anywhere for the crowd results.
+
+Design rules from round 3 still hold (your UI/UX skill, no purple, no gradients, no template look, one screen at 1440×900, floor plan is the hero). Then do round 3 step 5: screenshots into docs/brief/, push, one MESSAGE, and STOP for the user's feedback.
+
