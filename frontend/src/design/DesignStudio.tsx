@@ -316,7 +316,7 @@ function Steps({ active, onOpen, onHow }: { active: number; onOpen: (id: string)
           </button>
         </div>
       ))}
-      <a href="?physics=1" className="ml-auto px-2 py-1 text-[15px] text-dim underline-offset-4 hover:text-ink hover:underline">Why this physics</a>
+      <a href="?physics=1" className="ml-auto rounded-sm border border-line-strong px-3 py-1 text-[15px] text-ink hover:border-ink">Why not Hamiltonian?</a>
       <button onClick={onHow} className="rounded-sm border border-line-strong px-3 py-1 text-[15px] text-dim hover:border-ink hover:text-ink">How it works<Key k="H" /></button>
     </nav>
   )
