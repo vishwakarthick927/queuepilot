@@ -67,3 +67,25 @@ Run `git pull --rebase`. Read docs/PHYSICS.md (all of it) and data/design/mechan
 3. Keep PG-GNN and PG-CNN visible as before (the three-step strip). Keep the main screen simple.
 4. Make sure the dev server is running with `npm run dev -- --host`, and **tell the user the exact Local and Network links**, plus the direct link to the new section. Then screenshots (docs/brief/design_physics.png and one per building), push, one MESSAGE, and STOP for the user's feedback.
 
+## WIN, round 9 (15 Nov): "Why not Hamiltonian?" section. THIS IS THE CURRENT TASK. It replaces rounds 7 and 8.
+Run `git pull --rebase`. Build ONE new section on the Design Studio page called "Why not Hamiltonian?", opened by a clearly visible button on the main screen next to "How it works" and by the URL `?physics=1`. Use only data/design/mechanics.json (every number read from the file) and the reasons in docs/PHYSICS.md. Use your UI/UX Pro Max skill; same theme as the rest of the page, no purple, no gradients, one screen at 1440x900, no scrolling.
+
+The section shows exactly three things, big and simple:
+
+1. THE GRAPH (left, largest): "people still inside" over time for one evacuation, from `example`. Four lines: what really happens (`truth`), Hamiltonian / Lagrangian (`hamiltonian`), Hamiltonian + friction (`damped`), our physics (`least_action`). One value every 2 seconds. Draw the zero line boldly and shade everything below it in red with the label "Impossible: fewer than zero people". The Hamiltonian line visibly dips into the red area. Label each line directly on the chart.
+
+2. THE COMPARISON (right, top): five horizontal bars, "seconds of error in the time to get everyone out", worst at the top, best at the bottom, from `models.*.clearance_err_s`: Hamiltonian + friction (`damped`), Hamiltonian / Lagrangian (`hamiltonian`), GNN only (`gnn_only`), our physics only (`least_action`), PG-GNN (`pggnn`, ours, highlighted). The value at the end of each bar. Nothing else on this chart.
+
+3. THE REASON (right, bottom), one short card, large text:
+   Title: "Why Hamiltonian doesn't work for a crowd"
+   - "It conserves energy. A crowd doesn't: people stop, push and slow down."
+   - "Its flow has momentum that never dies, so it keeps emptying rooms that are already empty: down to [models.hamiltonian.most_negative_people] people in one room."
+   - "Then it swings back, like a pendulum: [models.hamiltonian.backflow_pct]% of all movement is AWAY from the exits."
+   - "Adding friction stops the swinging but the crowd creeps: only [models.damped.cleared_pct]% of buildings ever empty."
+   Under it, one line in the accent colour: "What we use instead: people are conserved, doors have limits, and the PG-GNN learns how a panicked crowd behaves."
+   Fill the bracketed values from mechanics.json.
+
+One small footer line: "Simulated crowd. Same 320 evacuations for every model, on 16 floor plans none of them had seen."
+
+Do not add tables of raw data, extra metrics or long paragraphs to this section. Keep the main screen and the building switcher unchanged. Make sure `npm run dev -- --host` is running and tell the user the exact link to this section. Then save a screenshot to docs/brief/design_physics.png, push, post one MESSAGE, and STOP for the user's feedback.
+
