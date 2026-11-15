@@ -77,10 +77,11 @@ export default function VenueMap({ venue, density, openGates, flowing }: Props) 
               {q.name}
             </text>
             {d >= 0.5 && (
-              <text x={q.x + q.w / 2 - 7} y={q.y + q.h / 2 - 8} textAnchor="end"
-                className={d > danger * 0.62 && !hot ? 'zden num on-light' : 'zden num'}>
+              // narrow or flat zones (stairs, lanes) get a smaller number with no unit so it stays inside the box
+              <text x={q.w < 70 ? q.x : q.x + q.w / 2 - 7} y={q.y + q.h / 2 - (q.h < 45 ? 6 : 8)} textAnchor={q.w < 70 ? 'middle' : 'end'}
+                className={`${q.w < 70 || q.h < 45 ? 'zden small' : 'zden'} num${d > danger * 0.62 && !hot ? ' on-light' : ''}`}>
                 {d.toFixed(1)}
-                <tspan className="zunit"> /m²</tspan>
+                {q.w >= 70 && <tspan className="zunit"> /m²</tspan>}
               </text>
             )}
             {q.kind === 'source' && <text x={q.x - q.w / 2 + 7} y={q.y + q.h / 2 - 8} className="ztag">arrivals</text>}

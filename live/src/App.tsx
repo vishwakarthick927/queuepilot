@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { VENUES, TAB, densityAt, frameAt, lastFrame, fmt1, type Venue } from './data'
 import VenueMap from './VenueMap'
 import Timeline from './Timeline'
+import { NowRail, DoRail } from './Rails'
 
 // Modes: what no one does (today), the twin + an approved plan (qp), or both at once (side).
 export type Mode = 'today' | 'qp' | 'side'
@@ -59,6 +60,10 @@ export default function App() {
     if (f >= n) setF(0)
     setPlaying((p) => !p)
   }, [f, n])
+  // A person approves the plan; only possible once the twin has raised the alarm.
+  const approve = useCallback(() => {
+    if (mode === 'qp' && f >= alarmF && !approved) { setApproved(true); setPlaying(true) }
+  }, [mode, f, alarmF, approved])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -69,13 +74,15 @@ export default function App() {
       else if (k === 't') pickMode('today')
       else if (k === 'q') pickMode('qp')
       else if (k === 's') pickMode('side')
+      else if (k === 'a') approve()
+      else if (k === 'b') document.querySelector<HTMLButtonElement>('.broadcast')?.click()
       else if (k === 'r') { setF(0); setPlaying(false); setApproved(false) }
       else if (k === 'arrowright') setF((x) => Math.min(n, Math.floor(x) + 1))
       else if (k === 'arrowleft') setF((x) => Math.max(0, Math.ceil(x) - 1))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [play, pickVenue, pickMode, n])
+  }, [play, pickVenue, pickMode, n, approve])
 
   const planOn = mode === 'side' || (mode === 'qp' && approved)
   const run = planOn ? venue.with_queuepilot : venue.today
@@ -127,11 +134,18 @@ export default function App() {
         </nav>
       </header>
       <main className="body">
-        <aside className="rail"><h2>Now</h2></aside>
+        <NowRail venue={venue} run={run} f={f} planOn={planOn} twinOn={mode !== 'today'}
+          other={mode === 'side' ? venue.today : undefined} />
         <section className="center">
           <div className="venue-head">
-            <h1>{venue.name}</h1>
-            <span className="place">{venue.place} · {venue.total_people.toLocaleString('en-IN')} people</span>
+            <div className="vh-row">
+              <h1>{venue.name}</h1>
+              <span className="place">{venue.total_people.toLocaleString('en-IN')} people</span>
+            </div>
+            <p className="result">
+              Alarm <b className="num qp">{fmt1(venue.forecast.warning_min)} minutes</b> before the crush.
+              Peak crowd <b className="num">{fmt1(venue.today.peak_density)}</b> → <b className="num qp">{fmt1(venue.with_queuepilot.peak_density)}</b> people per m².
+            </p>
           </div>
           <div className={mode === 'side' ? 'stage split' : 'stage'}>
             {mode === 'side' ? <>{pane(false)}{pane(true)}</> : pane(planOn)}
@@ -139,14 +153,12 @@ export default function App() {
           <Timeline venue={venue} f={f} playing={playing} showQp={mode !== 'today'} approved={planOn}
             onSeek={(x) => { setF(x); setPlaying(false) }} onPlay={play} />
         </section>
-        <aside className="rail right"><h2>Do</h2>{mode === 'qp' && f >= alarmF && !approved && (
-          <button className="approve" onClick={() => { setApproved(true); setPlaying(true) }}>Approve plan</button>
-        )}</aside>
+        <DoRail key={venue.id} venue={venue} f={f} twinOn={mode !== 'today'} approved={planOn} onApprove={approve} />
       </main>
       <footer className="foot">
         <span>Simulated crowd on a schematic layout. A person approves every action. Counts only, no faces.</span>
         <span className="spacer" />
-        <span className="num">{run === venue.today ? 'no intervention' : 'plan approved'}</span>
+        <span className="inspired">Inspired by <b>{venue.inspired_by.event}</b>, {venue.inspired_by.date}: {venue.inspired_by.toll}. Layout is schematic, not a reconstruction.</span>
       </footer>
     </div>
   )
