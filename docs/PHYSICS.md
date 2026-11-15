@@ -26,3 +26,33 @@ Short answer: **Hamiltonian dynamics, no. Two related ideas, yes**: the Hamilton
 3. Do not add Hamiltonian neural networks.
 
 Citations to verify before quoting: Hughes, "A continuum theory for the flow of pedestrians", Transportation Research B, 2002; Greydanus et al., "Hamiltonian Neural Networks", NeurIPS 2019.
+
+---
+
+# TESTED (15 Nov, `python -m engine.mechanics` → data/design/mechanics.json, mechanics.png). All simulated.
+Same test for every model: 320 evacuations on 16 floor plans never used for fitting; truth = engine/evac.py. Each model's constants were fitted on ~100 training runs first (grid search), so each gets its best shot.
+
+| Model | Error in time to get everyone out | What goes wrong / right, and why |
+|---|---|---|
+| Hamiltonian + friction | 112.5 ± 14.6 s | Friction stops the sloshing but makes the crowd creep: only 82% of buildings ever empty. Rooms still dip to −2.3 people; 10% of movement is away from the exits. There is no door limit in the equations, so no setting fits both the fast start and the slow tail. |
+| Hamiltonian / Lagrangian (energy conserved) | 81.5 ± 16.1 s | Energy cannot leave, so the crowd "sloshes": **42.5% of all movement is AWAY from the exits**, and momentum carries rooms to **−90.8 people** (impossible). Euler–Lagrange gives the same equations, so this covers both. |
+| GNN only (no physics) | 51.7 ± 6.9 s | Learns from data but nothing stops it inventing people: 328 created or lost per run (WIN's result). |
+| Least action: fastest path for everyone (physics only) | 22.1 ± 2.4 s | The Lagrangian idea that DOES fit (path of least travel time = eikonal / Hamilton–Jacobi). Never breaks a law, but assumes people are rational: misses the rush to the known exit and door jams. |
+| **PG-GNN (ours)** | **4.7 ± 0.7 s** | Keeps the least-action routing and conservation of people as hard physics; learns only exit choice and door efficiency. 0 people created or lost. (WIN's result, same 320 runs.) |
+
+Fitted constants: Hamiltonian g = 0.0002, k = 1.0; damped g = 0.002, k = 3.0, γ = 0.05 (best in the grids in engine/mechanics.py; the frictionless g sits at the grid's lower edge, i.e. it wants to be as slow as possible).
+
+**Lagrange multipliers on the exit search (the part that helps):** minimise `exits + λ × (seconds over the limit)/10` by local search with rising λ, against trying every layout.
+
+| Building | Every layout tried | Lagrange search | Same answer? |
+|---|---|---|---|
+| Community hall | 511 layouts | 31 | yes, 3 exits, 146 s |
+| School wing | 127 | 38 | yes, 3 exits, 148 s |
+| Office floor | 127 | 23 | yes, 3 exits, 90 s |
+| Apartment floor | 127 | 18 | yes, 2 exits, 64 s |
+| Cinema level | 127 | 13 | yes, 2 exits, 102 s |
+
+Same answer on all five with 3–16× fewer layouts simulated. Honest limit: five small buildings; a local search can miss the best layout on a harder one, which is why the result is re-checked in the simulator.
+
+**What to say:** "We tested it. Hamiltonian and Lagrangian equations of motion conserve energy; a crowd does not, so that model sends 42% of the movement away from the exits and predicts negative people. The parts of Lagrange's and Hamilton's work that fit are least-action routing, which is already inside our physics, and Lagrange multipliers, which find the same exits with up to 16 times fewer simulations. The PG-GNN on top of the right physics has the lowest error, 4.7 seconds."
+

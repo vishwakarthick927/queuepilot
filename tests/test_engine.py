@@ -149,6 +149,14 @@ def test_smoke_only_comes_from_the_fire_and_blocks_corridors():
     assert len(smoke.smoke_fire(p, start, g=g)["close"]) >= 1                # it blocks at least one corridor passage
 
 
+def test_hamiltonian_crowd_breaks_positivity_and_sloshes():
+    from engine import mechanics
+    p = _demo()
+    out = mechanics.hamiltonian_run(p, [0, 1, 3], None, None, g=0.0002, k=1.0)
+    assert out["min_people"] < 0 and out["backflow"] > 0.1        # negative people, movement away from exits
+    assert mechanics.least_action_run(p, [0, 1, 3], None, None)["min_people"] >= -1e-6
+
+
 if __name__ == "__main__":
     import warnings; warnings.filterwarnings("ignore")
     for name, fn in list(globals().items()):
