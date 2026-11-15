@@ -51,7 +51,7 @@
 | M1 | engine/plans.py: floor-plan generator → graph; data/design/demo_plan.json. Push first, post keys. | MAIN | Done |
 | M2 | engine/evac.py: detailed evacuation simulator (panic, familiarity, herding, door jam, fire closes edges) + tests | MAIN | Done |
 | M3 | python -m engine.design_data → train.npz (gitignored) + sample.npz + plans.json | MAIN | Done |
-| M4 | engine/design.py: truth ranking of layouts, rule-of-thumb layout, max-flow bound, min-cut, code-minimum check → data/design/design.json (+ animation frames) | MAIN | In progress |
+| M4 | engine/design.py: truth ranking of layouts, rule-of-thumb layout, max-flow bound, min-cut, code-minimum check → data/design/design.json (+ animation frames) | MAIN | Done (across_plans being added) |
 | M5 | verify entry point: re-check given layouts in the detailed simulator | MAIN | Done |
 | W1 | research/design/pggnn.py: physics / GNN only / PG-GNN, train, test on unseen plans → results.json | WIN | In progress (claimed 10:35) |
 | W2 | research/design/recommend.py: screen all layouts with PG-GNN, candidate value scores, verify top 5 via M5 → recommend.json | WIN | In progress (claimed 10:35) |

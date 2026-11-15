@@ -172,13 +172,32 @@ def verify(plan, layouts, panic=DESIGN_PANIC):
     return [score(plan, l, panic) for l in layouts]
 
 
-def frames(plan, layout, fire, panic):
+def frames(plan, layout, panic, fire=None, lost_exit=None, label="no fire"):
     """People per node per step, for the page's animation (1 decimal to keep the file small)."""
-    r = evac.simulate(plan, layout, fire=fire, panic=panic)
-    return dict(exits=sorted(layout), fire=None if fire is None else fire["id"], panic=panic,
-                clearance_s=r["clearance_s"], people=np.round(r["people"], 1).tolist(),
+    r = evac.simulate(plan, layout, fire=fire, lost_exit=lost_exit, panic=panic)
+    return dict(exits=sorted(layout), scenario=label, fire=None if fire is None else fire["id"], lost_exit=lost_exit,
+                panic=panic, clearance_s=r["clearance_s"], people=np.round(r["people"], 1).tolist(),
                 evacuated=np.round(r["evacuated"], 1).tolist(),
                 exit_use={str(k): round(v, 1) for k, v in r["exit_use"].items()})
+
+
+def worst_scenario(plan, layout, panic=DESIGN_PANIC):
+    """The scenario (label, fire, lost_exit) in which this layout does worst."""
+    def t(sc):
+        r = evac.simulate(plan, layout, fire=sc[1], lost_exit=sc[2], panic=panic, record=False)
+        return r["clearance_s"] if r["clearance_s"] is not None else float("inf")
+    return max(scenarios(plan, layout), key=t)
+
+
+def demo_frames(plan, chosen, rule_layout):
+    """Both layouts in the SAME scenario: the one where the rule-of-thumb layout does worst.
+    If that scenario blocks an exit only one layout has, fall back to the worst corridor fire for the rule layout."""
+    label, fire, lost = worst_scenario(plan, rule_layout)
+    if lost is not None and lost not in chosen:
+        label, fire, lost = max(((l, f, x) for l, f, x in scenarios(plan, rule_layout) if f is not None),
+                                key=lambda sc: evac.simulate(plan, rule_layout, fire=sc[1], panic=DESIGN_PANIC, record=False)["clearance_s"] or 1e9)
+    return dict(chosen=frames(plan, chosen, DESIGN_PANIC, fire, lost, label),
+                rule_of_thumb=frames(plan, rule_layout, DESIGN_PANIC, fire, lost, label)), label, fire
 
 
 def across_plans(n_plans=20, first_seed=1000):
@@ -216,19 +235,16 @@ def build(plan, with_across=True):
     main = by_panic[str(DESIGN_PANIC)]
     chosen = main["chosen"]["exits"] if main["chosen"] else rule_of_thumb(plan, 2)
     same_count_rule = rule_of_thumb(plan, len(chosen))
-    worst_fire = next((f for f in plan["fires"] if main["chosen"] and f"fire {f['id']} " in (main["rule_same_count"]["worst_fire"] or "")), plan["fires"][0])
     calm = score(plan, chosen, 0.0)
+    fr, fr_label, fr_fire = demo_frames(plan, chosen, same_count_rule)
+    bound = flow_bound(plan, chosen)
     out = dict(
         plan=plan["id"], safe_limit_s=plan["safe_limit_s"], design_panic=DESIGN_PANIC, panic_levels=PANIC_LEVELS,
-        exit_core_m2=EXIT_CORE_M2, simulated=True,
+        exit_core_m2=EXIT_CORE_M2, m2_per_exit=EXIT_CORE_M2, simulated=True,
         chosen=main["chosen"], rule_of_thumb=main["rule_of_thumb"], by_panic=by_panic,
-        bound_maxflow_s=flow_bound(plan, chosen)["bound_s"], min_cut=flow_bound(plan, chosen)["min_cut"],
-        maxflow_rate_per_s=flow_bound(plan, chosen)["rate_per_s"],
+        bound_maxflow_s=bound["bound_s"], min_cut=bound["min_cut"], maxflow_rate_per_s=bound["rate_per_s"],
         cost_of_panic=dict(calm_s=calm["worst_case_s"], panic_s=main["chosen"]["worst_case_s"] if main["chosen"] else None),
-        frames=dict(chosen=frames(plan, chosen, worst_fire, DESIGN_PANIC),
-                    rule_of_thumb=frames(plan, same_count_rule, worst_fire, DESIGN_PANIC)))
-    out["frames_fire"] = worst_fire["id"]
-    out["m2_per_exit"] = EXIT_CORE_M2
+        frames=fr, frames_scenario=fr_label, frames_fire=None if fr_fire is None else fr_fire["id"])
     if with_across:
         out["across_plans"] = across_plans()
     return out
