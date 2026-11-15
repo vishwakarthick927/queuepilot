@@ -46,4 +46,5 @@
 | V1 | docs/FACTS.md: verify every fact in CROWD.md "Why it matters" with source links | Member 3 | Todo |
 | C5 | CONSTRAINT 1 (docs/CONSTRAINTS.md): exit-design optimiser in engine/crowd.py. Input: floor graph + candidate exit positions + fire scenarios. Output: fewest exits whose clearance time ≤ safe limit in every scenario incl. loss of any one exit; min-cut says "widen this door" vs "add an exit". Export data/crowd/design.json | MAIN | Todo (waiting for user go) |
 | W-C5 | CONSTRAINT 1 view: "Design" tab: floor plan, candidate exits, slider "number of exits" vs clearance time curve, chosen layout vs rule-of-thumb layout, space freed | WIN (proposed) | Todo |
+| C6 | Panic + exit familiarity model (softmax exit choice, herding, compliance, density-dependent door throughput); design search (C5) scored under panic, not ideal behaviour; export exit_share | MAIN | Todo (waiting for user go) |
 
